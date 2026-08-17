@@ -141,13 +141,21 @@ Panel {
 
   // Shown wherever the readouts are not: vertical bars are too narrow for text,
   // and turning the values off must still leave something clickable in the bar.
-  component MetricGlyph: Text {
+  //
+  // OpticalGlyph centers the glyph's ink rather than its advance box, and the
+  // item takes that painted width — a Text here would reserve the glyph's
+  // trailing side bearing too, and the open-panel mark, which follows this
+  // content's width, would run past the icon.
+  component MetricGlyph: OpticalGlyph {
+    readonly property real glyphSize: Style.bar.iconFont + Style.space(2)
+
     visible: button.vertical || !root.showValues
+    implicitWidth: visible ? Math.ceil(tightWidth) : 0
+    implicitHeight: visible ? Math.ceil(glyphSize * 1.2) : 0
     text: Model.widgetIcon()
-    font.pixelSize: Style.bar.iconFont + Style.space(2)
+    fontSize: glyphSize
+    fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
     color: root.bar ? root.bar.barForeground : Color.foreground
-    font.family: root.bar ? root.bar.fontFamily : Style.font.family
-    renderType: Text.NativeRendering
   }
 
   // One metric's bar readout: its name above the current value, both small
