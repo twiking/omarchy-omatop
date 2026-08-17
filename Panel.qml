@@ -160,8 +160,10 @@ Panel {
       color: root.bar ? root.bar.barForeground : Color.foreground
       opacity: 0.6
       font.family: root.bar ? root.bar.fontFamily : Style.font.family
-      font.pixelSize: Math.max(6, Style.font.caption - Style.space(2))
+      font.pixelSize: Math.max(5, Style.font.caption - Style.space(4))
       font.letterSpacing: 0.5
+      lineHeightMode: Text.FixedHeight
+      lineHeight: Math.max(6, Style.font.caption - Style.space(3))
       renderType: Text.NativeRendering
     }
 
@@ -172,7 +174,9 @@ Panel {
       text: meterLabel.value !== "" ? meterLabel.value : "—"
       color: root.bar ? root.bar.barForeground : Color.foreground
       font.family: root.bar ? root.bar.fontFamily : Style.font.family
-      font.pixelSize: Style.font.caption
+      font.pixelSize: Math.max(7, Style.font.caption - Style.space(2))
+      lineHeightMode: Text.FixedHeight
+      lineHeight: Math.max(8, Style.font.caption - Style.space(1))
       renderType: Text.NativeRendering
     }
   }
