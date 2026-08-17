@@ -44,6 +44,16 @@ function fraction(percent) {
   return clampPercent(percent) / 100
 }
 
+// Widest value string in the list, used to size the value column so the rows
+// start flush with the panel's left edge instead of inside a fixed gutter.
+function longestValue(procs) {
+  var widest = ""
+  for (var i = 0; i < (procs ? procs.length : 0); i++) {
+    if (procs[i].value.length > widest.length) widest = procs[i].value
+  }
+  return widest
+}
+
 function metricTitle(metric) {
   return metric === "memory" ? "Omatop Memory" : "Omatop CPU"
 }

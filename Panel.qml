@@ -76,6 +76,17 @@ Panel {
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
+  // Sized to the widest value currently listed, so the process rows sit flush
+  // against the panel's left edge whatever the values are.
+  readonly property real valueColumnWidth: Math.ceil(valueMetrics.advanceWidth)
+
+  TextMetrics {
+    id: valueMetrics
+    font.family: root.bar ? root.bar.fontFamily : Style.font.family
+    font.pixelSize: Style.font.bodySmall
+    text: Model.longestValue(root.procs)
+  }
+
   TextMetrics {
     id: labelMetrics
     font.family: root.bar ? root.bar.fontFamily : Style.font.family
@@ -224,7 +235,7 @@ Panel {
                   font.family: root.bar.fontFamily
                   font.pixelSize: Style.font.bodySmall
                   horizontalAlignment: Text.AlignRight
-                  width: Style.space(56)
+                  width: root.valueColumnWidth
                 }
 
                 Text {
@@ -248,8 +259,10 @@ Panel {
                 font.family: root.bar.fontFamily
                 font.pixelSize: Style.font.caption
                 elide: Text.ElideRight
-                width: parent.width - Style.space(66)
-                x: Style.space(66)
+                width: parent.width - indent
+                x: indent
+
+                readonly property real indent: root.valueColumnWidth + Style.space(10)
               }
             }
           }
