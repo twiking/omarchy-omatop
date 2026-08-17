@@ -30,6 +30,10 @@ Panel {
   property string detailLabel: ""
   property var procs: []
 
+  // Docker blue, fixed rather than themed — same tag color the Waybar modules
+  // used, so a container row reads as a container row under any theme.
+  readonly property color dockerColor: "#50a0e0"
+
   readonly property string title: Model.metricTitle(metric)
   readonly property string icon: Model.metricIcon(metric)
   readonly property real fraction: Model.fraction(total)
@@ -254,8 +258,8 @@ Panel {
               Text {
                 visible: modelData.container !== ""
                 text: "└ " + modelData.container
-                color: root.bar.foreground
-                opacity: 0.5
+                color: root.dockerColor
+                opacity: 0.9
                 font.family: root.bar.fontFamily
                 font.pixelSize: Style.font.caption
                 elide: Text.ElideRight
