@@ -15,8 +15,8 @@ Panel {
 
   readonly property int processCount: Math.max(1, Math.min(20, setting("processCount", 7)))
   readonly property int refreshIntervalSec: Math.max(1, Math.min(60, setting("refreshIntervalSec", 3)))
-  // `showLabel` is the pre-1.1 name for this key; entries written before the
-  // rename still carry it.
+  // `showLabel` was this key's name in pre-release builds; entries written then
+  // still carry it.
   readonly property bool showValues: setting("showValues", setting("showLabel", true)) === true
 
   readonly property string statsPath: String(Qt.resolvedUrl("bin/omatop-stats")).replace(/^file:\/\//, "")

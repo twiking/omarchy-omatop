@@ -7,12 +7,23 @@ popup, which processes are actually eating them.
 - **Per-process breakdown** — the top consumers per metric, aggregated by process name
 - **Docker-aware** — processes inside containers show the container name underneath
 - **Smart process names** — resolves unhelpful names like `MainThread`, Nix wrappers, and generic interpreters to the real application
-- **Themed** — colors, font, and popup chrome come from the shell theme, so it matches the rest of the bar
 
 ![The Omatop popup](preview.png)
 
 This is the Omarchy-shell port of
 [waybar-top-cpu-mem](https://github.com/twiking/waybar-top-cpu-mem).
+
+## Requirements
+
+- Omarchy with `omarchy-shell` (Quattro or newer)
+- `bash`, `nproc`, `top`, `ps`, and `free` — the `coreutils` and `procps-ng`
+  packages an Omarchy install already has
+- A Nerd Font as the bar font, for the metric and chart glyphs (Omarchy's default)
+- Optional: `docker` — container names appear only when the Docker CLI is present;
+  without it that step is skipped
+
+Omatop needs no elevated privileges: it reads `/proc`, `ps`, and (when present)
+`docker ps` as your own user.
 
 ## Install
 
@@ -22,6 +33,24 @@ omarchy plugin enable io.github.twiking.omatop
 ```
 
 The widget lands in the bar's right section; move it with `omarchy bar move`.
+
+## Update
+
+```bash
+omarchy plugin update io.github.twiking.omatop
+```
+
+## Remove
+
+```bash
+omarchy plugin disable io.github.twiking.omatop   # takes it off the bar
+omarchy plugin remove io.github.twiking.omatop    # deletes the plugin checkout
+```
+
+Removal deletes `~/.config/omarchy/plugins/io.github.twiking.omatop/`. Omatop
+writes nothing outside its own settings keys in the widget's `bar.layout` entry
+in `~/.config/omarchy/shell.json`; `omarchy plugin disable` drops that entry, and
+no other file is touched.
 
 ## Settings
 
