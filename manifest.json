@@ -21,7 +21,7 @@
     "defaults": {
       "processCount": 7,
       "refreshIntervalSec": 3,
-      "showLabel": true
+      "showValues": true
     },
     "schema": [
       {
@@ -43,10 +43,11 @@
         "defaultValue": 3
       },
       {
-        "key": "showLabel",
+        "key": "showValues",
         "type": "boolean",
-        "label": "Show the CPU and MEM captions",
-        "defaultValue": true
+        "label": "Show the CPU and MEM values in the bar",
+        "defaultValue": true,
+        "description": "Off shows the metric icons instead."
       }
     ]
   }

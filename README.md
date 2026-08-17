@@ -41,7 +41,7 @@ first-party widgets do. Editing that entry by hand works just as well:
 |---|---|---|---|
 | `processCount` | integer 1–20 | `7` | How many processes the popup lists per metric |
 | `refreshIntervalSec` | integer 1–60 | `3` | How often stats are sampled |
-| `showLabel` | boolean | `true` | Show the `CPU` / `MEM` captions (horizontal bars only) |
+| `showValues` | boolean | `true` | Show the `CPU` / `MEM` readouts; off shows the metric icons instead |
 
 ```json
 {

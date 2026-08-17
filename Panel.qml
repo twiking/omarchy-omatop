@@ -15,7 +15,9 @@ Panel {
 
   readonly property int processCount: Math.max(1, Math.min(20, setting("processCount", 7)))
   readonly property int refreshIntervalSec: Math.max(1, Math.min(60, setting("refreshIntervalSec", 3)))
-  readonly property bool showLabel: setting("showLabel", true) === true
+  // `showLabel` is the pre-1.1 name for this key; entries written before the
+  // rename still carry it.
+  readonly property bool showValues: setting("showValues", setting("showLabel", true)) === true
 
   readonly property string statsPath: String(Qt.resolvedUrl("bin/omatop-stats")).replace(/^file:\/\//, "")
 
@@ -123,28 +125,28 @@ Panel {
       rowSpacing: Style.space(4)
       columnSpacing: Style.space(8)
 
-      MeterLabel {
-        label: "CPU"
+      MetricCaption {
+        name: "CPU"
         value: root.cpu.text
       }
 
-      MeterLabel {
-        label: "MEM"
+      MetricCaption {
+        name: "MEM"
         value: root.mem.text
       }
 
-      GlyphFallback { metric: "cpu" }
+      MetricGlyph { metric: "cpu" }
 
-      GlyphFallback { metric: "memory" }
+      MetricGlyph { metric: "memory" }
     }
   }
 
   // Shown wherever the captions are not: vertical bars are too narrow for text,
   // and turning the values off must still leave something clickable in the bar.
-  component GlyphFallback: Text {
+  component MetricGlyph: Text {
     property string metric: "cpu"
 
-    visible: button.vertical || !root.showLabel
+    visible: button.vertical || !root.showValues
     text: Model.metricIcon(metric)
     color: root.bar ? root.bar.barForeground : Color.foreground
     font.family: root.bar ? root.bar.fontFamily : Style.font.family
@@ -152,16 +154,16 @@ Panel {
     renderType: Text.NativeRendering
   }
 
-  // A meter's caption: its name above the current value, both small enough that
-  // the two lines together fit the bar's height, and centered on each other.
-  // Hidden on vertical bars, where there is no room for text.
-  component MeterLabel: Item {
-    id: meterLabel
+  // One metric's bar readout: its name above the current value, both small
+  // enough that the two lines together fit the bar's height, and centered on
+  // each other. Hidden wherever a glyph stands in instead.
+  component MetricCaption: Item {
+    id: caption
 
-    property string label: ""
+    property string name: ""
     property string value: ""
 
-    visible: !button.vertical && root.showLabel
+    visible: !button.vertical && root.showValues
     implicitWidth: visible ? Math.ceil(Math.max(nameText.implicitWidth, valueText.implicitWidth)) : 0
     implicitHeight: visible ? Math.ceil(nameText.implicitHeight + valueText.implicitHeight) : 0
 
@@ -169,7 +171,7 @@ Panel {
       id: nameText
       anchors.top: parent.top
       anchors.horizontalCenter: parent.horizontalCenter
-      text: meterLabel.label
+      text: caption.name
       color: root.bar ? root.bar.barForeground : Color.foreground
       opacity: 0.6
       font.family: root.bar ? root.bar.fontFamily : Style.font.family
@@ -184,7 +186,7 @@ Panel {
       id: valueText
       anchors.bottom: parent.bottom
       anchors.horizontalCenter: parent.horizontalCenter
-      text: meterLabel.value !== "" ? meterLabel.value : "—"
+      text: caption.value !== "" ? caption.value : "—"
       color: root.bar ? root.bar.barForeground : Color.foreground
       font.family: root.bar ? root.bar.fontFamily : Style.font.family
       font.pixelSize: Math.max(7, Style.font.caption - Style.space(2))
@@ -293,14 +295,14 @@ Panel {
             }
 
             Button {
-              text: root.showLabel ? "Hide bar values" : "Show bar values"
+              text: root.showValues ? "Hide bar values" : "Show bar values"
               foreground: root.bar.foreground
               fontFamily: root.bar.fontFamily
               fontSize: Style.font.bodySmall
               horizontalPadding: Style.spacing.controlPaddingX
               verticalPadding: Style.spacing.controlPaddingY
               bordered: true
-              onClicked: root.saveSetting("showLabel", !root.showLabel)
+              onClicked: root.saveSetting("showValues", !root.showValues)
             }
           }
         }
