@@ -25,7 +25,14 @@ The widget lands in the bar's right section; move it with `omarchy bar move`.
 
 ## Settings
 
-Settings live in the widget's `shell.json` layout entry:
+The popup has a collapsed `SETTINGS` section at the bottom — click the header to
+expand it and change the refresh interval, the number of processes listed per
+metric, or whether the bar prints values. Changes save immediately.
+
+There is no config file of Omatop's own: bar widgets are configured inline in
+their `bar.layout` entry in `~/.config/omarchy/shell.json`, which the shell owns,
+so the panel writes through the shell's `updateEntryInline` the same way the
+first-party widgets do. Editing that entry by hand works just as well:
 
 | Key | Type | Default | What it does |
 |---|---|---|---|

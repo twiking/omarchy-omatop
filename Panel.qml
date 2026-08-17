@@ -28,6 +28,19 @@ Panel {
   readonly property real openPanelIndicatorWidth: button.vertical ? 0 : Math.ceil(barContent.implicitWidth)
   readonly property real openPanelIndicatorHeight: button.vertical ? Math.ceil(barContent.implicitHeight) : 0
 
+  property bool settingsExpanded: false
+
+  // Widget settings live inline in this widget's `bar.layout` entry in
+  // ~/.config/omarchy/shell.json; the shell owns that file, so changes go
+  // through updateEntryInline rather than a config file of our own.
+  function saveSetting(key, value) {
+    var next = Object.assign({}, root.settings)
+    next[key] = value
+    root.settings = next
+    if (root.bar && root.bar.shell && typeof root.bar.shell.updateEntryInline === "function")
+      root.bar.shell.updateEntryInline(root.moduleName, next)
+  }
+
   // Docker blue, fixed rather than themed — same tag color the Waybar modules
   // used, so a container row reads as a container row under any theme.
   readonly property color dockerColor: "#50a0e0"
@@ -217,7 +230,138 @@ Panel {
           metric: "memory"
           stats: root.mem
         }
+
+        PanelSeparator { foreground: root.bar.foreground }
+
+        // ---------- Settings, collapsed until asked for ----------
+        Column {
+          width: parent.width
+          spacing: Style.space(10)
+
+          Item {
+            width: parent.width
+            implicitHeight: Math.max(settingsHeader.implicitHeight, settingsChevron.implicitHeight)
+
+            PanelSectionHeader {
+              id: settingsHeader
+              text: "SETTINGS"
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+              anchors.left: parent.left
+              anchors.verticalCenter: parent.verticalCenter
+            }
+
+            Text {
+              id: settingsChevron
+              text: root.settingsExpanded ? "\uf077" : "\uf078"
+              color: root.bar.foreground
+              opacity: 0.6
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+            }
+
+            MouseArea {
+              anchors.fill: parent
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.settingsExpanded = !root.settingsExpanded
+            }
+          }
+
+          Column {
+            width: parent.width
+            visible: root.settingsExpanded
+            spacing: Style.space(10)
+
+            SettingRow {
+              label: "Refresh interval"
+              suffix: "seconds"
+              value: root.refreshIntervalSec
+              from: 1
+              to: 60
+              onCommitted: function(next) { root.saveSetting("refreshIntervalSec", next) }
+            }
+
+            SettingRow {
+              label: "Processes per metric"
+              suffix: "rows"
+              value: root.processCount
+              from: 1
+              to: 20
+              onCommitted: function(next) { root.saveSetting("processCount", next) }
+            }
+
+            Button {
+              text: root.showLabel ? "Hide bar values" : "Show bar values"
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+              fontSize: Style.font.bodySmall
+              horizontalPadding: Style.spacing.controlPaddingX
+              verticalPadding: Style.spacing.controlPaddingY
+              bordered: true
+              onClicked: root.saveSetting("showLabel", !root.showLabel)
+            }
+          }
+        }
       }
+    }
+  }
+
+  // A labeled number setting: name and unit on the left, spinner on the right.
+  component SettingRow: Item {
+    id: settingRow
+
+    property string label: ""
+    property string suffix: ""
+    property int value: 0
+    property int from: 1
+    property int to: 60
+
+    signal committed(int next)
+
+    width: parent.width
+    implicitHeight: Math.max(rowLabel.implicitHeight, field.implicitHeight)
+
+    Column {
+      id: rowLabel
+      anchors.left: parent.left
+      anchors.right: field.left
+      anchors.rightMargin: Style.space(10)
+      anchors.verticalCenter: parent.verticalCenter
+      spacing: Style.spacing.labelGap
+
+      Text {
+        text: settingRow.label
+        color: root.bar.foreground
+        font.family: root.bar.fontFamily
+        font.pixelSize: Style.font.bodySmall
+        elide: Text.ElideRight
+        width: parent.width
+      }
+
+      Text {
+        visible: settingRow.suffix !== ""
+        text: settingRow.suffix
+        color: root.bar.foreground
+        opacity: 0.5
+        font.family: root.bar.fontFamily
+        font.pixelSize: Style.font.caption
+      }
+    }
+
+    NumberField {
+      id: field
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      value: settingRow.value
+      from: settingRow.from
+      to: settingRow.to
+      stepSize: 1
+      foreground: root.bar.foreground
+      fontFamily: root.bar.fontFamily
+      fontSize: Style.font.bodySmall
+      onModified: function(next) { settingRow.committed(next) }
     }
   }
 
