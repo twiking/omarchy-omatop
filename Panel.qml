@@ -99,39 +99,64 @@ Panel {
       else root.toggle()
     }
 
-    // Horizontal bars get meter + value per metric side by side; vertical bars
-    // have no room for text, so they stack the two meters and let the popup
-    // carry the numbers.
+    // Horizontal bars label each meter with its name turned on its side;
+    // vertical bars have no room for that, so they stack the bare meters and
+    // let the popup carry the detail.
     Grid {
       id: barContent
       anchors.centerIn: parent
-      columns: button.vertical ? 1 : 4
+      columns: button.vertical ? 1 : 2
       rows: button.vertical ? 2 : 1
       flow: Grid.LeftToRight
-      rowSpacing: Style.space(3)
-      columnSpacing: Style.space(5)
+      rowSpacing: Style.space(4)
+      columnSpacing: Style.space(8)
 
-      LevelMeter { fraction: Model.fraction(root.cpu.total) }
-
-      Text {
-        visible: !button.vertical && root.showLabel
-        text: root.cpu.text
-        color: root.bar ? root.bar.barForeground : Color.foreground
-        font.family: root.bar ? root.bar.fontFamily : Style.font.family
-        font.pixelSize: Style.bar.iconFont
-        renderType: Text.NativeRendering
+      MeterGroup {
+        label: "CPU"
+        fraction: Model.fraction(root.cpu.total)
       }
 
-      LevelMeter { fraction: Model.fraction(root.mem.total) }
-
-      Text {
-        visible: !button.vertical && root.showLabel
-        text: root.mem.text
-        color: root.bar ? root.bar.barForeground : Color.foreground
-        font.family: root.bar ? root.bar.fontFamily : Style.font.family
-        font.pixelSize: Style.bar.iconFont
-        renderType: Text.NativeRendering
+      MeterGroup {
+        label: "MEM"
+        fraction: Model.fraction(root.mem.total)
       }
+    }
+  }
+
+  // One metric in the bar: its name on its side, then its meter.
+  component MeterGroup: Row {
+    property string label: ""
+    property real fraction: 0
+
+    spacing: Style.space(3)
+
+    MeterLabel { text: parent.label }
+
+    LevelMeter { fraction: parent.fraction }
+  }
+
+  // A meter's name, rotated to read bottom-to-top so three characters fit in
+  // the bar's height. Hidden on vertical bars, where there is no room for it.
+  component MeterLabel: Item {
+    id: meterLabel
+
+    property string text: ""
+
+    visible: !button.vertical && root.showLabel
+    implicitWidth: visible ? Math.ceil(labelText.implicitHeight) : 0
+    implicitHeight: visible ? Math.ceil(labelText.implicitWidth) : 0
+
+    Text {
+      id: labelText
+      anchors.centerIn: parent
+      text: meterLabel.text
+      rotation: -90
+      color: root.bar ? root.bar.barForeground : Color.foreground
+      opacity: 0.7
+      font.family: root.bar ? root.bar.fontFamily : Style.font.family
+      font.pixelSize: Style.font.caption
+      font.letterSpacing: 0.5
+      renderType: Text.NativeRendering
     }
   }
 
