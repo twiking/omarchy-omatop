@@ -161,7 +161,7 @@ Panel {
             text: root.label !== "" ? root.label : "—"
             color: root.bar.foreground
             font.family: root.bar.fontFamily
-            font.pixelSize: Style.font.displayLarge
+            font.pixelSize: Style.font.title
             font.bold: true
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
