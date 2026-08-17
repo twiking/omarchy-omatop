@@ -29,6 +29,9 @@ The popup has a collapsed `SETTINGS` section at the bottom — click the header 
 expand it and change the refresh interval, the number of processes listed per
 metric, or whether the bar prints values. Changes save immediately.
 
+With the values turned off the bar falls back to the CPU and memory glyphs, so
+the widget stays visible and clickable.
+
 There is no config file of Omatop's own: bar widgets are configured inline in
 their `bar.layout` entry in `~/.config/omarchy/shell.json`, which the shell owns,
 so the panel writes through the shell's `updateEntryInline` the same way the

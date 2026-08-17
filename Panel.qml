@@ -112,9 +112,9 @@ Panel {
       else root.toggle()
     }
 
-    // Horizontal bars show each metric's name above its value; vertical bars
-    // have no room for text and fall back to the metric glyphs, with the popup
-    // carrying the detail.
+    // Each metric shows its name above its value; with the values turned off,
+    // or on a vertical bar where text does not fit, the metric glyphs stand in
+    // and the popup carries the detail.
     Grid {
       id: barContent
       anchors.centerIn: parent
@@ -139,12 +139,12 @@ Panel {
     }
   }
 
-  // Vertical bars are too narrow for the captions, so they show the metric
-  // glyphs instead and leave the numbers to the popup.
+  // Shown wherever the captions are not: vertical bars are too narrow for text,
+  // and turning the values off must still leave something clickable in the bar.
   component GlyphFallback: Text {
     property string metric: "cpu"
 
-    visible: button.vertical
+    visible: button.vertical || !root.showLabel
     text: Model.metricIcon(metric)
     color: root.bar ? root.bar.barForeground : Color.foreground
     font.family: root.bar ? root.bar.fontFamily : Style.font.family
