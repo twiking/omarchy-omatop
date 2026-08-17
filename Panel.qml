@@ -22,10 +22,11 @@ Panel {
   property var cpu: Model.emptyStats()
   property var mem: Model.emptyStats()
 
-  // With the values shown the button paints a text block, so the open-panel
-  // mark takes the painted width of the whole label instead of the default
-  // fraction of the slot, which stops short of the last glyph.
-  readonly property real openPanelIndicatorWidth: showLabel && !button.vertical ? button.glyphPaintedWidth : 0
+  // The button paints meters and values, so the open-panel mark takes the
+  // painted extent of that content instead of the default fraction of the slot,
+  // which would stop short of it.
+  readonly property real openPanelIndicatorWidth: button.vertical ? 0 : Math.ceil(barContent.implicitWidth)
+  readonly property real openPanelIndicatorHeight: button.vertical ? Math.ceil(barContent.implicitHeight) : 0
 
   // Docker blue, fixed rather than themed — same tag color the Waybar modules
   // used, so a container row reads as a container row under any theme.
@@ -82,35 +83,94 @@ Panel {
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
-  TextMetrics {
-    id: labelMetrics
-    font.family: root.bar ? root.bar.fontFamily : Style.font.family
-    font.pixelSize: Style.bar.iconFont
-    text: button.text
-  }
-
-  BarIconButton {
+  // The bar button paints its own level meters rather than a glyph, so it uses
+  // WidgetButton directly (BarIconButton is glyph-shaped) with the label off.
+  WidgetButton {
     id: button
     anchors.fill: parent
     bar: root.bar
-    // Vertical bars have no room for two values, so they fall back to the CPU
-    // glyph alone and the popup carries the detail.
-    text: {
-      if (vertical || !root.showLabel) return Model.metricIcon("cpu")
-      var parts = []
-      if (root.cpu.text !== "") parts.push(root.cpu.text + " " + Model.metricIcon("cpu"))
-      if (root.mem.text !== "") parts.push(root.mem.text + " " + Model.metricIcon("memory"))
-      return parts.length > 0 ? parts.join("  ") : Model.metricIcon("cpu")
-    }
-    // The label is a text block wider than an icon, so the slot has to follow
-    // the measured text width or it bleeds into the next widget.
-    slotSize: root.showLabel && !vertical
-      ? Math.max(Style.bar.iconSlot, Math.ceil(labelMetrics.advanceWidth) + Style.space(12))
-      : Style.bar.iconSlot
+    labelVisible: false
+    hasVisualContent: true
+    fixedWidth: vertical ? -1 : Math.ceil(barContent.implicitWidth) + Style.space(12)
+    fixedHeight: vertical ? Math.ceil(barContent.implicitHeight) + Style.space(8) : -1
     tooltipText: ""
     onPressed: function(b) {
       if (b === Qt.RightButton) root.bar.run("omarchy-launch-or-focus-tui btop")
       else root.toggle()
+    }
+
+    // Horizontal bars get meter + value per metric side by side; vertical bars
+    // have no room for text, so they stack the two meters and let the popup
+    // carry the numbers.
+    Grid {
+      id: barContent
+      anchors.centerIn: parent
+      columns: button.vertical ? 1 : 4
+      rows: button.vertical ? 2 : 1
+      flow: Grid.LeftToRight
+      rowSpacing: Style.space(3)
+      columnSpacing: Style.space(5)
+
+      LevelMeter { fraction: Model.fraction(root.cpu.total) }
+
+      Text {
+        visible: !button.vertical && root.showLabel
+        text: root.cpu.text
+        color: root.bar ? root.bar.barForeground : Color.foreground
+        font.family: root.bar ? root.bar.fontFamily : Style.font.family
+        font.pixelSize: Style.bar.iconFont
+        renderType: Text.NativeRendering
+      }
+
+      LevelMeter { fraction: Model.fraction(root.mem.total) }
+
+      Text {
+        visible: !button.vertical && root.showLabel
+        text: root.mem.text
+        color: root.bar ? root.bar.barForeground : Color.foreground
+        font.family: root.bar ? root.bar.fontFamily : Style.font.family
+        font.pixelSize: Style.bar.iconFont
+        renderType: Text.NativeRendering
+      }
+    }
+  }
+
+  // A single level bar: fills bottom-up on a horizontal bar, left-to-right on a
+  // vertical one, and turns urgent once the resource is nearly exhausted.
+  component LevelMeter: Item {
+    id: meter
+
+    property real fraction: 0
+    readonly property bool horizontalFill: button.vertical
+    readonly property color fillColor: fraction >= 0.9
+      ? (root.bar ? root.bar.urgent : Color.urgent)
+      : (root.bar ? root.bar.barForeground : Color.foreground)
+
+    implicitWidth: horizontalFill ? Math.max(Style.space(16), button.barSize - Style.space(12)) : Style.space(6)
+    implicitHeight: horizontalFill ? Style.space(6) : Style.space(16)
+
+    Rectangle {
+      id: meterTrack
+      anchors.fill: parent
+      radius: Math.min(width, height) / 2
+      color: Qt.rgba(meter.fillColor.r, meter.fillColor.g, meter.fillColor.b, 0.22)
+    }
+
+    Rectangle {
+      anchors.left: meterTrack.left
+      anchors.bottom: meterTrack.bottom
+      width: meter.horizontalFill
+        ? Math.max(meterTrack.height, meterTrack.width * meter.fraction)
+        : meterTrack.width
+      height: meter.horizontalFill
+        ? meterTrack.height
+        : Math.max(meterTrack.width, meterTrack.height * meter.fraction)
+      radius: meterTrack.radius
+      color: meter.fillColor
+
+      Behavior on width { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+      Behavior on height { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+      Behavior on color { ColorAnimation { duration: 200 } }
     }
   }
 

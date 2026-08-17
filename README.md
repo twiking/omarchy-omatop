@@ -3,7 +3,7 @@
 An Omarchy bar widget that shows CPU and memory usage side by side and, in its
 popup, which processes are actually eating them.
 
-- **CPU and memory in one widget** — both values in the bar, both process lists in one popup
+- **CPU and memory in one widget** — a level meter and value for each in the bar, both process lists in one popup
 - **Per-process breakdown** — the top consumers per metric, aggregated by process name
 - **Docker-aware** — processes inside containers show the container name underneath
 - **Smart process names** — resolves unhelpful names like `MainThread`, Nix wrappers, and generic interpreters to the real application
@@ -31,7 +31,7 @@ Settings live in the widget's `shell.json` layout entry:
 |---|---|---|---|
 | `processCount` | integer 1–20 | `7` | How many processes the popup lists per metric |
 | `refreshIntervalSec` | integer 1–60 | `3` | How often stats are sampled |
-| `showLabel` | boolean | `true` | Show the values next to the icons (horizontal bars only) |
+| `showLabel` | boolean | `true` | Show the values next to the meters (horizontal bars only) |
 
 ```json
 {
@@ -44,6 +44,14 @@ Settings live in the widget's `shell.json` layout entry:
   }
 }
 ```
+
+## The bar readout
+
+Each metric gets a small level meter that fills with its usage — bottom-up on a
+horizontal bar, left-to-right on a vertical one — and turns the theme's urgent
+color at 90% and above. Horizontal bars print the value next to each meter
+(`showLabel`); vertical bars show the two meters alone and leave the numbers to
+the popup.
 
 ## Interactions
 
