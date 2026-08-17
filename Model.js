@@ -3,8 +3,12 @@
 
 // Parse the TSV emitted by bin/omatop-stats into
 // { total, text, max, detail, detailLabel, procs: [{ value, name, container }] }.
+function emptyStats() {
+  return { total: 0, text: "", max: "", detail: "", detailLabel: "", procs: [] }
+}
+
 function parseStats(raw) {
-  var result = { total: 0, text: "", max: "", detail: "", detailLabel: "", procs: [] }
+  var result = emptyStats()
   var lines = String(raw || "").split("\n")
 
   for (var i = 0; i < lines.length; i++) {

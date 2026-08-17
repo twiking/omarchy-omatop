@@ -1,14 +1,15 @@
 # Omatop
 
-An Omarchy bar widget that shows CPU or memory usage and, in its popup, which
-processes are actually eating it.
+An Omarchy bar widget that shows CPU and memory usage side by side and, in its
+popup, which processes are actually eating them.
 
-- **Per-process breakdown** — the top consumers, aggregated by process name, right in the bar popup
+- **CPU and memory in one widget** — both values in the bar, both process lists in one popup
+- **Per-process breakdown** — the top consumers per metric, aggregated by process name
 - **Docker-aware** — processes inside containers show the container name underneath
 - **Smart process names** — resolves unhelpful names like `MainThread`, Nix wrappers, and generic interpreters to the real application
 - **Themed** — colors, font, and popup chrome come from the shell theme, so it matches the rest of the bar
 
-![Omatop memory popup](preview.png)
+![The Omatop popup](preview.png)
 
 This is the Omarchy-shell port of
 [waybar-top-cpu-mem](https://github.com/twiking/waybar-top-cpu-mem).
@@ -22,28 +23,22 @@ omarchy plugin enable io.github.twiking.omatop
 
 The widget lands in the bar's right section; move it with `omarchy bar move`.
 
-It is a single-metric widget, so add it twice — once with `metric: "cpu"` and
-once with `metric: "memory"` — to get both, the way the two Waybar modules
-worked.
-
 ## Settings
 
 Settings live in the widget's `shell.json` layout entry:
 
 | Key | Type | Default | What it does |
 |---|---|---|---|
-| `metric` | `"cpu"` \| `"memory"` | `"cpu"` | Which resource this instance tracks |
-| `processCount` | integer 1–20 | `10` | How many processes the popup lists |
+| `processCount` | integer 1–20 | `7` | How many processes the popup lists per metric |
 | `refreshIntervalSec` | integer 1–60 | `3` | How often stats are sampled |
-| `showLabel` | boolean | `true` | Show the value next to the icon (horizontal bars only) |
+| `showLabel` | boolean | `true` | Show the values next to the icons (horizontal bars only) |
 
 ```json
 {
   "bar": {
     "layout": {
       "right": [
-        { "id": "io.github.twiking.omatop", "metric": "cpu" },
-        { "id": "io.github.twiking.omatop", "metric": "memory", "processCount": 8 }
+        { "id": "io.github.twiking.omatop", "processCount": 7 }
       ]
     }
   }
@@ -58,9 +53,10 @@ Settings live in the widget's `shell.json` layout entry:
 
 ## How it works
 
-`bin/omatop-stats <cpu|memory> [count]` collects everything in one shot and
-prints line-based TSV; `Panel.qml` polls it on a timer and `Model.js` parses it.
-Running the script by hand is the fastest way to debug a wrong-looking number.
+`bin/omatop-stats <cpu|memory> [count]` collects one metric in a single shot and
+prints line-based TSV; `Panel.qml` runs it once per metric on a timer and
+`Model.js` parses the output. Running the script by hand is the fastest way to
+debug a wrong-looking number.
 
 ### CPU
 
@@ -72,7 +68,8 @@ the two are joined by PID.
 
 Memory is aggregated per process name using RSS from `ps`, so multiple instances
 of the same program (browser tabs, workers) are summed into one row. The bar
-label shows used memory in GB; the usage bar shows the percentage of total RAM.
+label shows used memory in GB, the panel adds total RAM after it, and the usage
+bar shows the percentage of that total.
 
 ### Process name resolution
 

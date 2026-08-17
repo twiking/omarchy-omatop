@@ -5,74 +5,67 @@ import qs.Commons
 import qs.Ui
 import "Model.js" as Model
 
-// Omatop — CPU or memory usage in the bar, with a per-process breakdown in
-// the popup. One widget instance covers one metric; add the widget twice
-// (metric: "cpu" and metric: "memory") to get both, the way the original
-// Waybar modules were configured.
+// Omatop — CPU and memory in one bar widget: both values in the bar, and a
+// popup that lists the top processes for each, the way `top` shows them
+// together rather than as two separate readouts.
 Panel {
   id: root
   moduleName: "io.github.twiking.omatop"
+  ipcTarget: "omatop"
 
-  readonly property string metric: setting("metric", "cpu") === "memory" ? "memory" : "cpu"
-  readonly property int processCount: Math.max(1, Math.min(20, setting("processCount", 10)))
+  readonly property int processCount: Math.max(1, Math.min(20, setting("processCount", 7)))
   readonly property int refreshIntervalSec: Math.max(1, Math.min(60, setting("refreshIntervalSec", 3)))
   readonly property bool showLabel: setting("showLabel", true) === true
 
-  // Widget can be placed twice, so the IPC target is per-metric rather than
-  // per-plugin — two instances may not claim the same target.
-  ipcTarget: "omatop-" + metric
-
   readonly property string statsPath: String(Qt.resolvedUrl("bin/omatop-stats")).replace(/^file:\/\//, "")
 
-  property real total: 0
-  property string label: ""
-  // Capacity the value is measured against — total RAM for the memory metric,
-  // empty for CPU, where the 100% ceiling is implied.
-  property string max: ""
-  property string detail: ""
-  property string detailLabel: ""
-  property var procs: []
+  property var cpu: Model.emptyStats()
+  property var mem: Model.emptyStats()
 
-  // With the value shown the button paints a text block, so the open-panel
-  // mark takes the painted width of value + glyph instead of the default
-  // fraction of the slot, which stops short of the icon.
+  // With the values shown the button paints a text block, so the open-panel
+  // mark takes the painted width of the whole label instead of the default
+  // fraction of the slot, which stops short of the last glyph.
   readonly property real openPanelIndicatorWidth: showLabel && !button.vertical ? button.glyphPaintedWidth : 0
 
   // Docker blue, fixed rather than themed — same tag color the Waybar modules
   // used, so a container row reads as a container row under any theme.
   readonly property color dockerColor: "#50a0e0"
 
-  readonly property string title: Model.metricTitle(metric)
-  readonly property string icon: Model.metricIcon(metric)
-  readonly property real fraction: Model.fraction(total)
-
-  // The bar label is polled continuously; the process list only matters while
-  // the popup is up, but it rides along in the same call so opening the panel
-  // shows data immediately instead of after the next tick.
+  // Both metrics are sampled on every tick: the bar shows both values, and the
+  // popup then opens on data that is already current.
   function refresh() {
-    if (statsProc.running) return
-    statsProc.command = ["bash", root.statsPath, root.metric, String(root.processCount)]
-    statsProc.running = true
+    if (!cpuProc.running) {
+      cpuProc.command = ["bash", root.statsPath, "cpu", String(root.processCount)]
+      cpuProc.running = true
+    }
+    if (!memProc.running) {
+      memProc.command = ["bash", root.statsPath, "memory", String(root.processCount)]
+      memProc.running = true
+    }
   }
 
-  function apply(raw) {
+  function apply(raw, metric) {
     var parsed = Model.parseStats(raw)
     // A transient empty read (fork failure, process churn) must not blank the
     // bar — keep the last good sample instead.
     if (parsed.text === "") return
-    total = parsed.total
-    label = parsed.text
-    max = parsed.max
-    detail = parsed.detail
-    detailLabel = parsed.detailLabel
-    procs = parsed.procs
+    if (metric === "memory") mem = parsed
+    else cpu = parsed
   }
 
   Process {
-    id: statsProc
+    id: cpuProc
     stdout: StdioCollector {
       waitForEnd: true
-      onStreamFinished: root.apply(text)
+      onStreamFinished: root.apply(text, "cpu")
+    }
+  }
+
+  Process {
+    id: memProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.apply(text, "memory")
     }
   }
 
@@ -89,17 +82,6 @@ Panel {
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
-  // Sized to the widest value currently listed, so the process rows sit flush
-  // against the panel's left edge whatever the values are.
-  readonly property real valueColumnWidth: Math.ceil(valueMetrics.advanceWidth)
-
-  TextMetrics {
-    id: valueMetrics
-    font.family: root.bar ? root.bar.fontFamily : Style.font.family
-    font.pixelSize: Style.font.bodySmall
-    text: Model.longestValue(root.procs)
-  }
-
   TextMetrics {
     id: labelMetrics
     font.family: root.bar ? root.bar.fontFamily : Style.font.family
@@ -111,12 +93,17 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: root.showLabel && !vertical && root.label !== ""
-      ? root.label + " " + root.icon
-      : root.icon
-    // With the value shown the button paints a text block wider than an icon,
-    // so the slot has to follow the measured text width or the label bleeds
-    // into the next widget.
+    // Vertical bars have no room for two values, so they fall back to the CPU
+    // glyph alone and the popup carries the detail.
+    text: {
+      if (vertical || !root.showLabel) return Model.metricIcon("cpu")
+      var parts = []
+      if (root.cpu.text !== "") parts.push(root.cpu.text + " " + Model.metricIcon("cpu"))
+      if (root.mem.text !== "") parts.push(root.mem.text + " " + Model.metricIcon("memory"))
+      return parts.length > 0 ? parts.join("  ") : Model.metricIcon("cpu")
+    }
+    // The label is a text block wider than an icon, so the slot has to follow
+    // the measured text width or it bleeds into the next widget.
     slotSize: root.showLabel && !vertical
       ? Math.max(Style.bar.iconSlot, Math.ceil(labelMetrics.advanceWidth) + Style.space(12))
       : Style.bar.iconSlot
@@ -148,169 +135,190 @@ Panel {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        spacing: Style.space(14)
+        spacing: Style.space(16)
 
-        // ---------- Hero: icon · title · current value ----------
-        Item {
+        MetricSection {
           width: parent.width
-          implicitHeight: Math.max(heroIcon.implicitHeight, heroTitle.implicitHeight, heroValue.implicitHeight)
-
-          Text {
-            id: heroIcon
-            text: root.icon
-            color: root.bar.foreground
-            font.family: root.bar.fontFamily
-            font.pixelSize: Style.font.display
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-          }
-
-          Text {
-            id: heroTitle
-            text: root.title
-            color: root.bar.foreground
-            font.family: root.bar.fontFamily
-            font.pixelSize: Style.font.title
-            font.bold: true
-            elide: Text.ElideRight
-            anchors.left: heroIcon.right
-            anchors.leftMargin: Style.space(14)
-            anchors.right: heroValue.left
-            anchors.rightMargin: Style.space(10)
-            anchors.verticalCenter: parent.verticalCenter
-          }
-
-          Text {
-            id: heroValue
-            text: root.label === ""
-              ? "—"
-              : (root.max !== "" ? root.label + " / " + root.max : root.label)
-            color: root.bar.foreground
-            font.family: root.bar.fontFamily
-            font.pixelSize: Style.font.title
-            font.bold: true
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-          }
-        }
-
-        // ---------- Usage bar ----------
-        Item {
-          width: parent.width
-          implicitHeight: Style.space(8)
-
-          Rectangle {
-            id: track
-            anchors.fill: parent
-            radius: height / 2
-            color: Qt.rgba(root.bar.foreground.r, root.bar.foreground.g, root.bar.foreground.b, 0.12)
-          }
-
-          Rectangle {
-            anchors.left: track.left
-            anchors.verticalCenter: track.verticalCenter
-            height: track.height
-            radius: track.radius
-            color: root.bar.foreground
-            width: Math.max(track.height, track.width * root.fraction)
-
-            Behavior on width { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
-          }
+          metric: "cpu"
+          stats: root.cpu
         }
 
         PanelSeparator { foreground: root.bar.foreground }
 
-        // ---------- Top processes ----------
-        Column {
+        MetricSection {
           width: parent.width
-          spacing: Style.space(8)
-
-          PanelSectionHeader {
-            text: "TOP PROCESSES"
-            foreground: root.bar.foreground
-            fontFamily: root.bar.fontFamily
-          }
-
-          Repeater {
-            model: root.procs
-
-            Column {
-              required property var modelData
-              width: column.width
-              spacing: Style.space(2)
-
-              Row {
-                width: parent.width
-                spacing: Style.space(10)
-
-                Text {
-                  id: procValue
-                  text: modelData.value
-                  color: root.bar.foreground
-                  font.family: root.bar.fontFamily
-                  font.pixelSize: Style.font.bodySmall
-                  horizontalAlignment: Text.AlignRight
-                  width: root.valueColumnWidth
-                }
-
-                Text {
-                  text: modelData.name
-                  color: root.bar.foreground
-                  opacity: 0.85
-                  font.family: root.bar.fontFamily
-                  font.pixelSize: Style.font.bodySmall
-                  elide: Text.ElideRight
-                  width: parent.width - procValue.width - parent.spacing
-                }
-              }
-
-              // Containerized process: name the container underneath, indented
-              // to line up with the process name above it.
-              Text {
-                visible: modelData.container !== ""
-                text: "└ " + modelData.container
-                color: root.dockerColor
-                opacity: 0.9
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.caption
-                elide: Text.ElideRight
-                width: parent.width - indent
-                x: indent
-
-                readonly property real indent: root.valueColumnWidth + Style.space(10)
-              }
-            }
-          }
+          metric: "memory"
+          stats: root.mem
         }
+      }
+    }
+  }
 
-        // ---------- Footer: load average / swap ----------
+  // One metric's block: hero line, usage bar, its top processes, and the
+  // metric's footer (load average for CPU, swap for memory).
+  component MetricSection: Column {
+    id: section
+
+    property string metric: "cpu"
+    property var stats: Model.emptyStats()
+
+    readonly property real fraction: Model.fraction(stats.total)
+    // Sized to the widest value in this section, so its rows sit flush against
+    // the panel's left edge whatever the values are.
+    readonly property real valueColumnWidth: Math.ceil(valueMetrics.advanceWidth)
+    readonly property real containerIndent: valueColumnWidth + Style.space(10)
+
+    spacing: Style.space(12)
+
+    TextMetrics {
+      id: valueMetrics
+      font.family: root.bar ? root.bar.fontFamily : Style.font.family
+      font.pixelSize: Style.font.bodySmall
+      text: Model.longestValue(section.stats.procs)
+    }
+
+    // ---------- Hero: icon · title · current value ----------
+    Item {
+      width: parent.width
+      implicitHeight: Math.max(heroIcon.implicitHeight, heroTitle.implicitHeight, heroValue.implicitHeight)
+
+      Text {
+        id: heroIcon
+        text: Model.metricIcon(section.metric)
+        color: root.bar.foreground
+        font.family: root.bar.fontFamily
+        font.pixelSize: Style.font.display
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+      }
+
+      Text {
+        id: heroTitle
+        text: Model.metricTitle(section.metric)
+        color: root.bar.foreground
+        font.family: root.bar.fontFamily
+        font.pixelSize: Style.font.title
+        font.bold: true
+        elide: Text.ElideRight
+        anchors.left: heroIcon.right
+        anchors.leftMargin: Style.space(14)
+        anchors.right: heroValue.left
+        anchors.rightMargin: Style.space(10)
+        anchors.verticalCenter: parent.verticalCenter
+      }
+
+      Text {
+        id: heroValue
+        text: section.stats.text === ""
+          ? "—"
+          : (section.stats.max !== "" ? section.stats.text + " / " + section.stats.max : section.stats.text)
+        color: root.bar.foreground
+        font.family: root.bar.fontFamily
+        font.pixelSize: Style.font.title
+        font.bold: true
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+      }
+    }
+
+    // ---------- Usage bar ----------
+    Item {
+      width: parent.width
+      implicitHeight: Style.space(8)
+
+      Rectangle {
+        id: track
+        anchors.fill: parent
+        radius: height / 2
+        color: Qt.rgba(root.bar.foreground.r, root.bar.foreground.g, root.bar.foreground.b, 0.12)
+      }
+
+      Rectangle {
+        anchors.left: track.left
+        anchors.verticalCenter: track.verticalCenter
+        height: track.height
+        radius: track.radius
+        color: root.bar.foreground
+        width: Math.max(track.height, track.width * section.fraction)
+
+        Behavior on width { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+      }
+    }
+
+    // ---------- Top processes ----------
+    Column {
+      width: parent.width
+      spacing: Style.space(6)
+
+      Repeater {
+        model: section.stats.procs
+
         Column {
+          required property var modelData
           width: parent.width
-          visible: root.detail !== ""
-          spacing: Style.space(8)
-
-          PanelSeparator { foreground: root.bar.foreground }
+          spacing: Style.space(2)
 
           Row {
             width: parent.width
-            spacing: Style.space(8)
+            spacing: Style.space(10)
 
             Text {
-              text: root.detailLabel
+              id: procValue
+              text: modelData.value
               color: root.bar.foreground
-              opacity: 0.6
               font.family: root.bar.fontFamily
               font.pixelSize: Style.font.bodySmall
+              horizontalAlignment: Text.AlignRight
+              width: section.valueColumnWidth
             }
 
             Text {
-              text: root.detail
+              text: modelData.name
               color: root.bar.foreground
+              opacity: 0.85
               font.family: root.bar.fontFamily
               font.pixelSize: Style.font.bodySmall
+              elide: Text.ElideRight
+              width: parent.width - procValue.width - parent.spacing
             }
           }
+
+          // Containerized process: name the container underneath, indented to
+          // line up with the process name above it.
+          Text {
+            visible: modelData.container !== ""
+            text: "└ " + modelData.container
+            color: root.dockerColor
+            opacity: 0.9
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.caption
+            elide: Text.ElideRight
+            width: parent.width - section.containerIndent
+            x: section.containerIndent
+          }
         }
+      }
+    }
+
+    // ---------- Footer: load average / swap ----------
+    Row {
+      width: parent.width
+      visible: section.stats.detail !== ""
+      spacing: Style.space(8)
+
+      Text {
+        text: section.stats.detailLabel
+        color: root.bar.foreground
+        opacity: 0.6
+        font.family: root.bar.fontFamily
+        font.pixelSize: Style.font.bodySmall
+      }
+
+      Text {
+        text: section.stats.detail
+        color: root.bar.foreground
+        font.family: root.bar.fontFamily
+        font.pixelSize: Style.font.bodySmall
       }
     }
   }
