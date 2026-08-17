@@ -26,6 +26,9 @@ Panel {
 
   property real total: 0
   property string label: ""
+  // Capacity the value is measured against — total RAM for the memory metric,
+  // empty for CPU, where the 100% ceiling is implied.
+  property string max: ""
   property string detail: ""
   property string detailLabel: ""
   property var procs: []
@@ -54,6 +57,7 @@ Panel {
     if (parsed.text === "") return
     total = parsed.total
     label = parsed.text
+    max = parsed.max
     detail = parsed.detail
     detailLabel = parsed.detailLabel
     procs = parsed.procs
@@ -173,7 +177,9 @@ Panel {
 
           Text {
             id: heroValue
-            text: root.label !== "" ? root.label : "—"
+            text: root.label === ""
+              ? "—"
+              : (root.max !== "" ? root.label + " / " + root.max : root.label)
             color: root.bar.foreground
             font.family: root.bar.fontFamily
             font.pixelSize: Style.font.title

@@ -2,9 +2,9 @@
 // TSV contract with bin/omatop-stats lives in one place.
 
 // Parse the TSV emitted by bin/omatop-stats into
-// { total, text, detail, detailLabel, procs: [{ value, name, container }] }.
+// { total, text, max, detail, detailLabel, procs: [{ value, name, container }] }.
 function parseStats(raw) {
-  var result = { total: 0, text: "", detail: "", detailLabel: "", procs: [] }
+  var result = { total: 0, text: "", max: "", detail: "", detailLabel: "", procs: [] }
   var lines = String(raw || "").split("\n")
 
   for (var i = 0; i < lines.length; i++) {
@@ -17,6 +17,9 @@ function parseStats(raw) {
       break
     case "text":
       result.text = f[1] || ""
+      break
+    case "max":
+      result.max = f[1] || ""
       break
     case "detail":
       result.detail = f[1] || ""

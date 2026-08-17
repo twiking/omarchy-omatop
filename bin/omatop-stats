@@ -7,6 +7,7 @@
 #
 #   total<TAB><0-100 percent used for the usage bar>
 #   text<TAB><bar label, e.g. "12.3%" or "6.2G">
+#   max<TAB><capacity the value is measured against, memory only>
 #   detail<TAB><footer line, e.g. "0.42  0.55  0.60">
 #   detailLabel<TAB><footer label, e.g. "Load">
 #   proc<TAB><value><TAB><name><TAB><container>
@@ -109,6 +110,7 @@ memory)
   free -k | awk '/^Mem:/ {
     printf "total\t%.1f\n", $3/$2*100
     printf "text\t%.1fG\n", $3/1048576
+    printf "max\t%.1fG\n", $2/1048576
   }'
   printf 'detailLabel\tSwap\n'
   free -k | awk '/^Swap:/ {printf "detail\t%.1fG / %.1fG\n", $3/1048576, $2/1048576}'
