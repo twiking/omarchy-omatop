@@ -45,7 +45,7 @@
       {
         "key": "showLabel",
         "type": "boolean",
-        "label": "Show the CPU and MEM labels next to the meters",
+        "label": "Show the stacked CPU and MEM labels next to the meters",
         "defaultValue": true
       }
     ]

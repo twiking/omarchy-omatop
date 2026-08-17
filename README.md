@@ -50,9 +50,9 @@ Settings live in the widget's `shell.json` layout entry:
 Each metric gets a small level meter that fills with its usage — bottom-up on a
 horizontal bar, left-to-right on a vertical one — and turns the theme's urgent
 color at 90% and above. On horizontal bars the metric's name sits to the left of
-its meter, rotated to read bottom-to-top so it fits the bar's height
-(`showLabel`); vertical bars show the two bare meters. The numbers live in the
-popup.
+its meter, stacked one tiny letter per line (`C`/`P`/`U`, `M`/`E`/`M`) so all
+three lines together are only as tall as the meter (`showLabel`); vertical bars
+show the two bare meters. The numbers live in the popup.
 
 ## Interactions
 

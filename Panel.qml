@@ -123,7 +123,7 @@ Panel {
     }
   }
 
-  // One metric in the bar: its name on its side, then its meter.
+  // One metric in the bar: its name stacked letter per letter, then its meter.
   component MeterGroup: Row {
     property string label: ""
     property real fraction: 0
@@ -135,27 +135,33 @@ Panel {
     LevelMeter { fraction: parent.fraction }
   }
 
-  // A meter's name, rotated to read bottom-to-top so three characters fit in
-  // the bar's height. Hidden on vertical bars, where there is no room for it.
+  // A meter's name stacked one letter per line, sized so all three lines
+  // together stand as tall as the meter beside them. Hidden on vertical bars,
+  // where there is no room for it.
   component MeterLabel: Item {
     id: meterLabel
 
     property string text: ""
+    // Three lines inside the meter's height: the glyph size is that height
+    // divided by the letter count, with the line box pulled tight around it.
+    readonly property int lineCount: Math.max(1, meterLabel.text.length)
+    readonly property real glyphSize: Math.max(4, Math.floor(Style.space(16) / lineCount))
 
     visible: !button.vertical && root.showLabel
-    implicitWidth: visible ? Math.ceil(labelText.implicitHeight) : 0
-    implicitHeight: visible ? Math.ceil(labelText.implicitWidth) : 0
+    implicitWidth: visible ? Math.ceil(labelText.implicitWidth) : 0
+    implicitHeight: visible ? Math.ceil(labelText.implicitHeight) : 0
 
     Text {
       id: labelText
       anchors.centerIn: parent
-      text: meterLabel.text
-      rotation: -90
+      text: meterLabel.text.split("").join("\n")
+      horizontalAlignment: Text.AlignHCenter
       color: root.bar ? root.bar.barForeground : Color.foreground
       opacity: 0.7
       font.family: root.bar ? root.bar.fontFamily : Style.font.family
-      font.pixelSize: Style.font.caption
-      font.letterSpacing: 0.5
+      font.pixelSize: meterLabel.glyphSize
+      lineHeightMode: Text.ProportionalHeight
+      lineHeight: 1.0
       renderType: Text.NativeRendering
     }
   }
