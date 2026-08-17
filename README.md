@@ -27,7 +27,8 @@ The widget lands in the bar's right section; move it with `omarchy bar move`.
 
 The popup has a collapsed `SETTINGS` section at the bottom — click the header to
 expand it and change the refresh interval, the number of processes listed per
-metric, or whether the bar prints values. Changes save immediately.
+metric, or what the bar shows (`Usage` vs `Icon only`). Changes save
+immediately.
 
 With the values turned off the bar falls back to a single bar-chart glyph
 (`nf-md-chart_bar`), so the widget stays visible and clickable.

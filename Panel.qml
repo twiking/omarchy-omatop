@@ -317,19 +317,75 @@ Panel {
               onCommitted: function(next) { root.saveSetting("processCount", next) }
             }
 
-            Button {
-              text: root.showValues ? "Hide bar values" : "Show bar values"
-              foreground: root.bar.foreground
-              fontFamily: root.bar.fontFamily
-              fontSize: Style.font.bodySmall
-              horizontalPadding: Style.spacing.controlPaddingX
-              verticalPadding: Style.spacing.controlPaddingY
-              bordered: true
-              onClicked: root.saveSetting("showValues", !root.showValues)
+            ChoiceRow {
+              label: "Bar shows"
+              suffix: root.showValues
+                ? "usage next to each name"
+                : "numbers only in this panel"
+              choice: root.showValues ? "Usage" : "Icon only"
+              onToggled: root.saveSetting("showValues", !root.showValues)
             }
           }
         }
       }
+    }
+  }
+
+  // A labeled two-state setting: name and explanation on the left, a button
+  // naming the state it is in on the right.
+  component ChoiceRow: Item {
+    id: choiceRow
+
+    property string label: ""
+    property string suffix: ""
+    property string choice: ""
+
+    signal toggled()
+
+    width: parent.width
+    implicitHeight: Math.max(choiceLabel.implicitHeight, choiceButton.implicitHeight)
+
+    Column {
+      id: choiceLabel
+      anchors.left: parent.left
+      anchors.right: choiceButton.left
+      anchors.rightMargin: Style.space(10)
+      anchors.verticalCenter: parent.verticalCenter
+      spacing: Style.spacing.labelGap
+
+      Text {
+        text: choiceRow.label
+        color: root.bar.foreground
+        font.family: root.bar.fontFamily
+        font.pixelSize: Style.font.bodySmall
+        elide: Text.ElideRight
+        width: parent.width
+      }
+
+      Text {
+        visible: choiceRow.suffix !== ""
+        text: choiceRow.suffix
+        color: root.bar.foreground
+        opacity: 0.5
+        font.family: root.bar.fontFamily
+        font.pixelSize: Style.font.caption
+        elide: Text.ElideRight
+        width: parent.width
+      }
+    }
+
+    Button {
+      id: choiceButton
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      text: choiceRow.choice
+      foreground: root.bar.foreground
+      fontFamily: root.bar.fontFamily
+      fontSize: Style.font.bodySmall
+      horizontalPadding: Style.spacing.controlPaddingX
+      verticalPadding: Style.spacing.controlPaddingY
+      bordered: true
+      onClicked: choiceRow.toggled()
     }
   }
 
