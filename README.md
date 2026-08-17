@@ -3,7 +3,7 @@
 An Omarchy bar widget that shows CPU and memory usage side by side and, in its
 popup, which processes are actually eating them.
 
-- **CPU and memory in one widget** — a labeled level meter for each in the bar, both process lists in one popup
+- **CPU and memory in one widget** — both readouts in the bar, both process lists in one popup
 - **Per-process breakdown** — the top consumers per metric, aggregated by process name
 - **Docker-aware** — processes inside containers show the container name underneath
 - **Smart process names** — resolves unhelpful names like `MainThread`, Nix wrappers, and generic interpreters to the real application
@@ -31,7 +31,7 @@ Settings live in the widget's `shell.json` layout entry:
 |---|---|---|---|
 | `processCount` | integer 1–20 | `7` | How many processes the popup lists per metric |
 | `refreshIntervalSec` | integer 1–60 | `3` | How often stats are sampled |
-| `showLabel` | boolean | `true` | Show the `CPU` / `MEM` labels next to the meters (horizontal bars only) |
+| `showLabel` | boolean | `true` | Show the `CPU` / `MEM` captions (horizontal bars only) |
 
 ```json
 {
@@ -47,12 +47,10 @@ Settings live in the widget's `shell.json` layout entry:
 
 ## The bar readout
 
-Each metric gets a small level meter that fills with its usage — bottom-up on a
-horizontal bar, left-to-right on a vertical one — and turns the theme's urgent
-color at 90% and above. On horizontal bars the metric's name sits to the left of
-its meter, stacked one tiny letter per line (`C`/`P`/`U`, `M`/`E`/`M`) so all
-three lines together are only as tall as the meter (`showLabel`); vertical bars
-show the two bare meters. The numbers live in the popup.
+Each metric is a two-line caption: its name in small type (`CPU`, `MEM`) with
+the current value under it, the two lines centered on each other and sized to fit
+the bar's height. Vertical bars have no room for text, so they show the metric
+glyphs instead and leave the numbers to the popup.
 
 ## Interactions
 

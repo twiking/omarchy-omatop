@@ -99,109 +99,81 @@ Panel {
       else root.toggle()
     }
 
-    // Horizontal bars label each meter with its name turned on its side;
-    // vertical bars have no room for that, so they stack the bare meters and
-    // let the popup carry the detail.
+    // Horizontal bars show each metric's name above its value; vertical bars
+    // have no room for text and fall back to the metric glyphs, with the popup
+    // carrying the detail.
     Grid {
       id: barContent
       anchors.centerIn: parent
       columns: button.vertical ? 1 : 2
-      rows: button.vertical ? 2 : 1
       flow: Grid.LeftToRight
       rowSpacing: Style.space(4)
       columnSpacing: Style.space(8)
 
-      MeterGroup {
+      MeterLabel {
         label: "CPU"
-        fraction: Model.fraction(root.cpu.total)
+        value: root.cpu.text
       }
 
-      MeterGroup {
+      MeterLabel {
         label: "MEM"
-        fraction: Model.fraction(root.mem.total)
+        value: root.mem.text
       }
+
+      GlyphFallback { metric: "cpu" }
+
+      GlyphFallback { metric: "memory" }
     }
   }
 
-  // One metric in the bar: its name stacked letter per letter, then its meter.
-  component MeterGroup: Row {
-    property string label: ""
-    property real fraction: 0
+  // Vertical bars are too narrow for the captions, so they show the metric
+  // glyphs instead and leave the numbers to the popup.
+  component GlyphFallback: Text {
+    property string metric: "cpu"
 
-    spacing: Style.space(3)
-
-    MeterLabel { text: parent.label }
-
-    LevelMeter { fraction: parent.fraction }
+    visible: button.vertical
+    text: Model.metricIcon(metric)
+    color: root.bar ? root.bar.barForeground : Color.foreground
+    font.family: root.bar ? root.bar.fontFamily : Style.font.family
+    font.pixelSize: Style.bar.iconFont
+    renderType: Text.NativeRendering
   }
 
-  // A meter's name stacked one letter per line, sized so all three lines
-  // together stand as tall as the meter beside them. Hidden on vertical bars,
-  // where there is no room for it.
+  // A meter's caption: its name above the current value, both small enough that
+  // the two lines together fit the bar's height, and centered on each other.
+  // Hidden on vertical bars, where there is no room for text.
   component MeterLabel: Item {
     id: meterLabel
 
-    property string text: ""
-    // Three lines inside the meter's height: the glyph size is that height
-    // divided by the letter count, with the line box pulled tight around it.
-    readonly property int lineCount: Math.max(1, meterLabel.text.length)
-    readonly property real glyphSize: Math.max(4, Math.floor(Style.space(16) / lineCount))
+    property string label: ""
+    property string value: ""
 
     visible: !button.vertical && root.showLabel
-    implicitWidth: visible ? Math.ceil(labelText.implicitWidth) : 0
-    implicitHeight: visible ? Math.ceil(labelText.implicitHeight) : 0
+    implicitWidth: visible ? Math.ceil(Math.max(nameText.implicitWidth, valueText.implicitWidth)) : 0
+    implicitHeight: visible ? Math.ceil(nameText.implicitHeight + valueText.implicitHeight) : 0
 
     Text {
-      id: labelText
-      anchors.centerIn: parent
-      text: meterLabel.text.split("").join("\n")
-      horizontalAlignment: Text.AlignHCenter
+      id: nameText
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      text: meterLabel.label
       color: root.bar ? root.bar.barForeground : Color.foreground
-      opacity: 0.7
+      opacity: 0.6
       font.family: root.bar ? root.bar.fontFamily : Style.font.family
-      font.pixelSize: meterLabel.glyphSize
-      lineHeightMode: Text.ProportionalHeight
-      lineHeight: 1.0
+      font.pixelSize: Math.max(6, Style.font.caption - Style.space(2))
+      font.letterSpacing: 0.5
       renderType: Text.NativeRendering
     }
-  }
 
-  // A single level bar: fills bottom-up on a horizontal bar, left-to-right on a
-  // vertical one, and turns urgent once the resource is nearly exhausted.
-  component LevelMeter: Item {
-    id: meter
-
-    property real fraction: 0
-    readonly property bool horizontalFill: button.vertical
-    readonly property color fillColor: fraction >= 0.9
-      ? (root.bar ? root.bar.urgent : Color.urgent)
-      : (root.bar ? root.bar.barForeground : Color.foreground)
-
-    implicitWidth: horizontalFill ? Math.max(Style.space(16), button.barSize - Style.space(12)) : Style.space(6)
-    implicitHeight: horizontalFill ? Style.space(6) : Style.space(16)
-
-    Rectangle {
-      id: meterTrack
-      anchors.fill: parent
-      radius: Math.min(width, height) / 2
-      color: Qt.rgba(meter.fillColor.r, meter.fillColor.g, meter.fillColor.b, 0.22)
-    }
-
-    Rectangle {
-      anchors.left: meterTrack.left
-      anchors.bottom: meterTrack.bottom
-      width: meter.horizontalFill
-        ? Math.max(meterTrack.height, meterTrack.width * meter.fraction)
-        : meterTrack.width
-      height: meter.horizontalFill
-        ? meterTrack.height
-        : Math.max(meterTrack.width, meterTrack.height * meter.fraction)
-      radius: meterTrack.radius
-      color: meter.fillColor
-
-      Behavior on width { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
-      Behavior on height { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
-      Behavior on color { ColorAnimation { duration: 200 } }
+    Text {
+      id: valueText
+      anchors.bottom: parent.bottom
+      anchors.horizontalCenter: parent.horizontalCenter
+      text: meterLabel.value !== "" ? meterLabel.value : "—"
+      color: root.bar ? root.bar.barForeground : Color.foreground
+      font.family: root.bar ? root.bar.fontFamily : Style.font.family
+      font.pixelSize: Style.font.caption
+      renderType: Text.NativeRendering
     }
   }
 
