@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+# Emit CPU or memory stats for the Omatop bar widget.
+#
+# Usage: omatop-stats <cpu|memory> [process-count]
+#
+# Output is line-based TSV so the QML side can parse it without jq:
+#
+#   total<TAB><0-100 percent used for the usage bar>
+#   text<TAB><bar label, e.g. "12.3%" or "6.2G">
+#   detail<TAB><footer line, e.g. "0.42  0.55  0.60">
+#   detailLabel<TAB><footer label, e.g. "Load">
+#   proc<TAB><value><TAB><name><TAB><container>
+#
+# `container` is empty for processes that are not inside a Docker container.
+
+set -uo pipefail
+
+metric=${1:-cpu}
+count=${2:-10}
+[[ "$count" =~ ^[0-9]+$ ]] || count=10
+
+# ---------------------------------------------------------------------------
+# Docker: map PIDs to container names via cgroup membership.
+# ---------------------------------------------------------------------------
+docker_pid_container=""
+
+if command -v docker &>/dev/null; then
+  declare -A _cid_name=()
+  while read -r _cid _cname; do
+    [[ -n "$_cid" ]] && _cid_name[$_cid]=$_cname
+  done < <(docker ps --no-trunc --format '{{.ID}} {{.Names}}' 2>/dev/null)
+
+  for _cgdir in /sys/fs/cgroup/system.slice/docker-*.scope; do
+    [[ -f "$_cgdir/cgroup.procs" ]] || continue
+    _cid=$(basename "$_cgdir")
+    _cid=${_cid#docker-}
+    _cid=${_cid%.scope}
+    _cname=${_cid_name[$_cid]:-}
+    [[ -z "$_cname" ]] && continue
+    while read -r _pid; do
+      [[ -n "$_pid" ]] && docker_pid_container+="${_pid}=${_cname} "
+    done < "$_cgdir/cgroup.procs"
+  done
+  unset _cid_name _cgdir _cid _cname _pid
+fi
+
+# Shared awk prologue: build pid -> container name lookup from the map above.
+read -r -d '' AWK_DOCKER_INIT <<'AWK'
+  n = split(dmap, entries, " ")
+  for (i = 1; i <= n; i++) {
+    eq = index(entries[i], "=")
+    if (eq > 0) ctr[substr(entries[i], 1, eq - 1)] = substr(entries[i], eq + 1)
+  }
+AWK
+
+case "$metric" in
+cpu)
+  # Normalize CPU% across all cores so the number matches btop (0-100% total).
+  ncpu=$(nproc)
+  total_cpu=$(top -b -n1 -w 256 | awk -v n="$ncpu" 'NR>7 {sum+=$9} END {printf "%.1f", sum/n}')
+
+  printf 'total\t%s\n' "$total_cpu"
+  printf 'text\t%s%%\n' "$total_cpu"
+  printf 'detailLabel\tLoad\n'
+  awk '{printf "detail\t%s  %s  %s\n", $1, $2, $3}' /proc/loadavg
+
+  # Aggregate CPU by resolved process name. `ps` supplies names (and the raw
+  # command line used to resolve unhelpful ones); `top` supplies the CPU
+  # percentages. Both are keyed by PID and joined in the second awk pass.
+  {
+    ps -eo pid=,comm=,args= --no-headers | awk -v dmap="${docker_pid_container}" "BEGIN {${AWK_DOCKER_INIT}}"'{
+      pid=$1; comm=$2
+      if (comm == "MainThread" || comm ~ /^\..*-wrap(ped)?$/) {
+        name=""
+        for (i=3; i<=NF; i++) {
+          if ($i ~ /^-/) continue
+          n=split($i, p, "/"); candidate=p[n]
+          if (candidate != "" && candidate !~ /^(node|python[0-9.]*|bash|sh|zsh|env)$/) { name=candidate; break }
+        }
+        if (name == "") name=comm
+      } else {
+        name=comm
+      }
+      print "PS", pid, name "\t" (ctr[pid] != "" ? ctr[pid] : "")
+    }'
+    top -b -n1 -o %CPU -w 256 | awk 'NR>7 && $9+0>0 {print "TOP", $1, $9}'
+  } | awk -v n="$ncpu" -F'\t' '
+    {
+      split($1, f, " ")
+      if (f[1] == "PS") {
+        pid = f[2]
+        nm = ""
+        for (i = 3; i <= length(f); i++) nm = (nm ? nm " " : "") f[i]
+        name[pid] = nm
+        container[pid] = $2
+      } else if (f[1] == "TOP") {
+        pid = f[2]
+        nm = (name[pid] ? name[pid] : "?")
+        if (nm == "?") next
+        agg[nm] += f[3] / n
+        ctr[nm] = container[pid]
+      }
+    }
+    END { for (nm in agg) printf "%.1f\t%s\t%s\n", agg[nm], nm, ctr[nm] }
+  ' | sort -rn | head -"$count" | awk -F'\t' '{printf "proc\t%.1f%%\t%s\t%s\n", $1, $2, $3}'
+  ;;
+
+memory)
+  free -k | awk '/^Mem:/ {
+    printf "total\t%.1f\n", $3/$2*100
+    printf "text\t%.1fG\n", $3/1048576
+  }'
+  printf 'detailLabel\tSwap\n'
+  free -k | awk '/^Swap:/ {printf "detail\t%.1fG / %.1fG\n", $3/1048576, $2/1048576}'
+
+  # Aggregate RSS by resolved process name so multiple instances of the same
+  # program (browser tabs, workers) are summed into one row.
+  ps -eo pid=,comm=,rss=,args= --no-headers | awk -v dmap="${docker_pid_container}" "BEGIN {${AWK_DOCKER_INIT}}"'{
+    pid=$1; comm=$2; rss=$3
+    if (comm == "MainThread" || comm ~ /^\..*-wrap(ped)?$/) {
+      name=""
+      for (i=4; i<=NF; i++) {
+        if ($i ~ /^-/) continue
+        n=split($i, p, "/"); candidate=p[n]
+        if (candidate != "" && candidate !~ /^(node|python[0-9.]*|bash|sh|zsh|env)$/) { name=candidate; break }
+      }
+      if (name == "") name=comm
+    } else {
+      name=comm
+    }
+    mem[name]+=rss
+    if (ctr[pid] != "") container[name]=ctr[pid]
+  } END {
+    for (name in mem) if (mem[name] > 0) printf "%d\t%s\t%s\n", mem[name], name, container[name]
+  }' | sort -rn | head -"$count" | awk -F'\t' '{
+    val=$1/1024; unit="M"
+    if (val >= 1000) { val/=1024; unit="G" }
+    printf "proc\t%.1f%s\t%s\t%s\n", val, unit, $2, $3
+  }'
+  ;;
+
+*)
+  echo "usage: omatop-stats <cpu|memory> [process-count]" >&2
+  exit 1
+  ;;
+esac

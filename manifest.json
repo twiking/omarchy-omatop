@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.twiking.omatop",
+  "name": "Omatop",
+  "version": "1.0.0",
+  "author": "Tobias Wiking",
+  "license": "MIT",
+  "description": "CPU or memory usage in the bar with a per-process breakdown popup, Docker container awareness, and smart process-name resolution.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Omatop",
+    "description": "Usage percentage plus the top processes eating CPU or memory, with Docker container names.",
+    "category": "System",
+    "allowMultiple": true,
+    "defaultSection": "right",
+    "defaults": {
+      "metric": "cpu",
+      "processCount": 10,
+      "refreshIntervalSec": 3,
+      "showLabel": true
+    },
+    "schema": [
+      {
+        "key": "metric",
+        "type": "enum",
+        "label": "Metric",
+        "options": ["cpu", "memory"],
+        "defaultValue": "cpu",
+        "description": "Add the widget twice — once per metric — to show both."
+      },
+      {
+        "key": "processCount",
+        "type": "integer",
+        "label": "Processes listed",
+        "min": 1,
+        "max": 20,
+        "step": 1,
+        "defaultValue": 10
+      },
+      {
+        "key": "refreshIntervalSec",
+        "type": "integer",
+        "label": "Refresh interval (seconds)",
+        "min": 1,
+        "max": 60,
+        "step": 1,
+        "defaultValue": 3
+      },
+      {
+        "key": "showLabel",
+        "type": "boolean",
+        "label": "Show the value next to the icon",
+        "defaultValue": true
+      }
+    ]
+  }
+}
