@@ -29,8 +29,8 @@ The popup has a collapsed `SETTINGS` section at the bottom — click the header 
 expand it and change the refresh interval, the number of processes listed per
 metric, or whether the bar prints values. Changes save immediately.
 
-With the values turned off the bar falls back to the CPU and memory glyphs, so
-the widget stays visible and clickable.
+With the values turned off the bar falls back to a single bar-chart glyph
+(`nf-md-chart_bar`), so the widget stays visible and clickable.
 
 There is no config file of Omatop's own: bar widgets are configured inline in
 their `bar.layout` entry in `~/.config/omarchy/shell.json`, which the shell owns,
@@ -41,7 +41,7 @@ first-party widgets do. Editing that entry by hand works just as well:
 |---|---|---|---|
 | `processCount` | integer 1–20 | `7` | How many processes the popup lists per metric |
 | `refreshIntervalSec` | integer 1–60 | `3` | How often stats are sampled |
-| `showValues` | boolean | `true` | Show the `CPU` / `MEM` readouts; off shows the metric icons instead |
+| `showValues` | boolean | `true` | Show the `CPU` / `MEM` readouts; off shows the bar-chart icon instead |
 
 ```json
 {
@@ -59,8 +59,8 @@ first-party widgets do. Editing that entry by hand works just as well:
 
 Each metric is a two-line caption: its name in small type (`CPU`, `MEM`) with
 the current value under it, the two lines centered on each other and sized to fit
-the bar's height. Vertical bars have no room for text, so they show the metric
-glyphs instead and leave the numbers to the popup.
+the bar's height. Vertical bars have no room for text, so they show the bar-chart
+glyph instead and leave the numbers to the popup.
 
 ## Interactions
 

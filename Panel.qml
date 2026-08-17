@@ -135,22 +135,18 @@ Panel {
         value: root.mem.text
       }
 
-      MetricGlyph { metric: "cpu" }
-
-      MetricGlyph { metric: "memory" }
+      MetricGlyph {}
     }
   }
 
-  // Shown wherever the captions are not: vertical bars are too narrow for text,
+  // Shown wherever the readouts are not: vertical bars are too narrow for text,
   // and turning the values off must still leave something clickable in the bar.
   component MetricGlyph: Text {
-    property string metric: "cpu"
-
     visible: button.vertical || !root.showValues
-    text: Model.metricIcon(metric)
+    text: Model.widgetIcon()
+    font.pixelSize: Style.bar.iconFont + Style.space(2)
     color: root.bar ? root.bar.barForeground : Color.foreground
     font.family: root.bar ? root.bar.fontFamily : Style.font.family
-    font.pixelSize: Style.bar.iconFont
     renderType: Text.NativeRendering
   }
 

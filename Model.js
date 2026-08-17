@@ -65,6 +65,12 @@ function metricTitle(metric) {
   return metric === "memory" ? "Omatop Memory" : "Omatop CPU"
 }
 
+// The widget's own glyph (nf-md-chart_bar), shown in place of the bar readouts
+// when the values are off or the bar is vertical.
+function widgetIcon() {
+  return "󰄨"
+}
+
 // Nerd Font glyphs: microchip for CPU, memory sticks for RAM.
 function metricIcon(metric) {
   return metric === "memory" ? "" : ""
