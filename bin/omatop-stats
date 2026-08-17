@@ -26,10 +26,14 @@ count=${2:-10}
 docker_pid_container=""
 
 if command -v docker &>/dev/null; then
+  # `docker ps` is the one call here that can block indefinitely: an
+  # unresponsive daemon leaves the client waiting, and the widget skips a
+  # refresh while the previous one is still running, so it would freeze on the
+  # last sample. A wedged daemon costs one lookup, not the whole readout.
   declare -A _cid_name=()
   while read -r _cid _cname; do
     [[ -n "$_cid" ]] && _cid_name[$_cid]=$_cname
-  done < <(docker ps --no-trunc --format '{{.ID}} {{.Names}}' 2>/dev/null)
+  done < <(timeout 2 docker ps --no-trunc --format '{{.ID}} {{.Names}}' 2>/dev/null)
 
   for _cgdir in /sys/fs/cgroup/system.slice/docker-*.scope; do
     [[ -f "$_cgdir/cgroup.procs" ]] || continue

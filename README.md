@@ -130,8 +130,12 @@ Both metrics handle cases where the reported process name is unhelpful:
 
 Processes running inside Docker containers are detected via cgroup membership
 (`/sys/fs/cgroup/system.slice/docker-*.scope`) and matched against
-`docker ps`. The container name is shown below the process row. With no Docker
-on the system, this step is skipped entirely.
+`docker ps`. The container name is shown below the process row.
+
+Docker is entirely optional. With no `docker` binary the lookup is skipped; if
+the binary is there but the daemon refuses the connection, the error is ignored;
+and if the daemon hangs, the call gives up after two seconds. In every case the
+readout is the same minus container names.
 
 ## Development
 
