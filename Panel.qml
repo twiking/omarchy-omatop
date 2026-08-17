@@ -33,6 +33,11 @@ Panel {
   property string detailLabel: ""
   property var procs: []
 
+  // With the value shown the button paints a text block, so the open-panel
+  // mark takes the painted width of value + glyph instead of the default
+  // fraction of the slot, which stops short of the icon.
+  readonly property real openPanelIndicatorWidth: showLabel && !button.vertical ? button.glyphPaintedWidth : 0
+
   // Docker blue, fixed rather than themed — same tag color the Waybar modules
   // used, so a container row reads as a container row under any theme.
   readonly property color dockerColor: "#50a0e0"
