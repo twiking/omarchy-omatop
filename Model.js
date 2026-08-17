@@ -45,7 +45,7 @@ function fraction(percent) {
 }
 
 function metricTitle(metric) {
-  return metric === "memory" ? "Memory" : "CPU"
+  return metric === "memory" ? "Omatop Memory" : "Omatop CPU"
 }
 
 // Nerd Font glyphs: microchip for CPU, memory sticks for RAM.
