@@ -25,7 +25,7 @@ The widget lands in the bar's right section; move it with `omarchy bar move`.
 
 ## Settings
 
-The popup has a collapsed `SETTINGS` section at the bottom — click the header to
+The popup has a collapsed `OMATOP SETTINGS` section at the bottom — click the header to
 expand it and change the refresh interval, the number of processes listed per
 metric, or what the bar shows (`Usage` vs `Icon only`). Changes save
 immediately.

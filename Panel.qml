@@ -269,7 +269,7 @@ Panel {
 
             PanelSectionHeader {
               id: settingsHeader
-              text: "SETTINGS"
+              text: "OMATOP SETTINGS"
               foreground: root.bar.foreground
               fontFamily: root.bar.fontFamily
               anchors.left: parent.left

@@ -62,7 +62,7 @@ function longestValue(procs) {
 }
 
 function metricTitle(metric) {
-  return metric === "memory" ? "Omatop Memory" : "Omatop CPU"
+  return metric === "memory" ? "Memory" : "CPU"
 }
 
 // The widget's own glyph (nf-md-chart_bar), shown in place of the bar readouts
