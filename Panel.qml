@@ -24,11 +24,23 @@ Panel {
   property var cpu: Model.emptyStats()
   property var mem: Model.emptyStats()
 
-  // The button paints meters and values, so the open-panel mark takes the
-  // painted extent of that content instead of the default fraction of the slot,
-  // which would stop short of it.
-  readonly property real openPanelIndicatorWidth: button.vertical ? 0 : Math.ceil(barContent.implicitWidth)
-  readonly property real openPanelIndicatorHeight: button.vertical ? Math.ceil(barContent.implicitHeight) : 0
+  // Text readouts on horizontal bars, the glyph everywhere else.
+  readonly property bool readoutsVisible: !button.vertical && showValues
+
+  // Measured off the readouts themselves rather than off their container: a
+  // positioner's implicit size carries spacing the content does not paint, and
+  // the open-panel mark below tracks this extent, so it would overshoot.
+  readonly property real contentWidth: readoutsVisible
+    ? Math.ceil(cpuCaption.implicitWidth + memCaption.implicitWidth + barContent.columnSpacing)
+    : Math.ceil(barGlyph.implicitWidth)
+  readonly property real contentHeight: readoutsVisible
+    ? Math.ceil(Math.max(cpuCaption.implicitHeight, memCaption.implicitHeight))
+    : Math.ceil(barGlyph.implicitHeight)
+
+  // The mark takes the painted extent of that content instead of the default
+  // fraction of the slot, which would stop short of it.
+  readonly property real openPanelIndicatorWidth: button.vertical ? 0 : contentWidth
+  readonly property real openPanelIndicatorHeight: button.vertical ? contentHeight : 0
 
   property bool settingsExpanded: false
 
@@ -106,8 +118,8 @@ Panel {
     bar: root.bar
     labelVisible: false
     hasVisualContent: true
-    fixedWidth: vertical ? -1 : Math.ceil(barContent.implicitWidth) + Style.space(12)
-    fixedHeight: vertical ? Math.ceil(barContent.implicitHeight) + Style.space(8) : -1
+    fixedWidth: vertical ? -1 : root.contentWidth + Style.space(12)
+    fixedHeight: vertical ? root.contentHeight + Style.space(8) : -1
     tooltipText: ""
     onPressed: function(b) {
       if (b === Qt.RightButton) root.bar.run("omarchy-launch-or-focus-tui btop")
@@ -115,27 +127,34 @@ Panel {
     }
 
     // Each metric shows its name above its value; with the values turned off,
-    // or on a vertical bar where text does not fit, the metric glyphs stand in
-    // and the popup carries the detail.
+    // or on a vertical bar where text does not fit, the widget glyph stands in
+    // and the popup carries the detail. Only one of the two forms is ever
+    // mounted, so neither reserves space for the other.
     Grid {
       id: barContent
       anchors.centerIn: parent
+      visible: root.readoutsVisible
       columns: button.vertical ? 1 : 2
       flow: Grid.LeftToRight
       rowSpacing: Style.space(4)
       columnSpacing: Style.space(8)
 
       MetricCaption {
+        id: cpuCaption
         name: "CPU"
         value: root.cpu.text
       }
 
       MetricCaption {
+        id: memCaption
         name: "MEM"
         value: root.mem.text
       }
+    }
 
-      MetricGlyph {}
+    MetricGlyph {
+      id: barGlyph
+      anchors.centerIn: parent
     }
   }
 
@@ -149,7 +168,7 @@ Panel {
   component MetricGlyph: OpticalGlyph {
     readonly property real glyphSize: Style.bar.iconFont + Style.space(2)
 
-    visible: button.vertical || !root.showValues
+    visible: !root.readoutsVisible
     implicitWidth: visible ? Math.ceil(tightWidth) : 0
     implicitHeight: visible ? Math.ceil(glyphSize * 1.2) : 0
     text: Model.widgetIcon()
@@ -167,7 +186,7 @@ Panel {
     property string name: ""
     property string value: ""
 
-    visible: !button.vertical && root.showValues
+    visible: root.readoutsVisible
     implicitWidth: visible ? Math.ceil(Math.max(nameText.implicitWidth, valueText.implicitWidth)) : 0
     implicitHeight: visible ? Math.ceil(nameText.implicitHeight + valueText.implicitHeight) : 0
 
