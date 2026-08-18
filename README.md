@@ -1,12 +1,13 @@
 # Omatop
 
-An Omarchy bar widget that shows CPU, memory, and disk usage side by side and,
-in its popup, which processes are actually eating the CPU and memory, and how
-each mounted disk is filling up.
+An Omarchy bar widget that shows CPU, memory, disk, and GPU usage side by side
+and, in its popup, which processes are actually eating the CPU and memory, and
+how each mounted disk is filling up.
 
-- **CPU, memory, and disk in one widget** — all three readouts in the bar, process lists and disk breakdown in one popup
+- **CPU, memory, disk, and GPU in one widget** — all four readouts in the bar, process lists and disk breakdown in one popup
 - **Per-process breakdown** — the top consumers per metric, aggregated by process name
 - **Multi-disk aware** — every mounted disk gets its own readout in the bar and its own section in the popup, not just the root filesystem
+- **GPU-aware** — NVIDIA, AMD, and Intel utilization, whichever vendor tool actually returns a reading
 - **Docker-aware** — processes inside containers show the container name underneath
 - **Smart process names** — resolves unhelpful names like `MainThread`, Nix wrappers, and generic interpreters to the real application
 
@@ -23,9 +24,14 @@ This is the Omarchy-shell port of
 - A Nerd Font as the bar font, for the metric and chart glyphs (Omarchy's default)
 - Optional: `docker` — container names appear only when the Docker CLI is present;
   without it that step is skipped
+- Optional: `lspci` (`pciutils`) for the GPU name, `nvidia-smi` (`nvidia-utils`)
+  for NVIDIA utilization — without them the GPU section still uses whatever
+  it can read from kernel sysfs and shows `n/a` if nothing is available
 
-Omatop needs no elevated privileges: it reads `/proc`, `ps`, and (when present)
-`docker ps` as your own user.
+Omatop needs no elevated privileges: it reads `/proc`, `ps`, sysfs, and (when
+present) `docker ps` and vendor GPU tools, all as your own user. There is no
+install script — every GPU source above is optional and auto-detected, so
+there is nothing to install just to enable the widget.
 
 ## Install
 
@@ -90,8 +96,8 @@ first-party widgets do. Editing that entry by hand works just as well:
 
 ## The bar readout
 
-Each metric is a two-line caption: its name in small type (`CPU`, `MEM`, `DISK`, or
-`DISK1`/`DISK2`/... on a machine with several disks) with
+Each metric is a two-line caption: its name in small type (`CPU`, `MEM`, `GPU`,
+`DISK`, or `DISK1`/`DISK2`/... on a machine with several disks) with
 the current value under it, the two lines centered on each other and sized to fit
 the bar's height. Vertical bars have no room for text, so they show the bar-chart
 glyph instead and leave the numbers to the popup.
@@ -104,7 +110,7 @@ glyph instead and leave the numbers to the popup.
 
 ## How it works
 
-`bin/omatop-stats <cpu|memory|disk> [count]` collects one metric in a single shot and
+`bin/omatop-stats <cpu|memory|disk|gpu> [count]` collects one metric in a single shot and
 prints line-based TSV; `Panel.qml` runs it once per metric on a timer and
 `Model.js` parses the output. Running the script by hand is the fastest way to
 debug a wrong-looking number.
@@ -136,6 +142,17 @@ mirrors this with one section per disk, named with its mount point, each with
 its own usage bar. By default the hero value is space left, since that is the
 number that tells you whether you are about to run out, with space used in
 the footer; the `Disk sections lead with` setting swaps the two.
+
+### GPU
+
+GPU utilization comes from whichever vendor source actually returns a reading,
+in order: NVIDIA (`nvidia-smi`, only queried once the driver is bound, since a
+leftover binary with no driver bound can hang for seconds), AMD (kernel sysfs
+`gpu_busy_percent`, no extra package), then Intel (RC6 idle residency sampled
+over a short window). The GPU name is looked up separately via `lspci`, so it
+can still show even on a machine where none of the above could read a
+utilization percentage. If nothing above is available the bar shows `n/a`
+rather than a wrong number.
 
 ### Process name resolution
 

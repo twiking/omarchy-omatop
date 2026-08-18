@@ -77,6 +77,7 @@ function longestValue(procs) {
 function metricTitle(metric) {
   if (metric === "memory") return "Memory"
   if (metric === "disk") return "Disk"
+  if (metric === "gpu") return "GPU"
   return "CPU"
 }
 
@@ -87,9 +88,10 @@ function widgetIcon() {
 }
 
 // Nerd Font glyphs: microchip for CPU, memory sticks for RAM, hard disk for
-// storage.
+// storage, graphics card for GPU.
 function metricIcon(metric) {
   if (metric === "memory") return ""
   if (metric === "disk") return "󰋊"
+  if (metric === "gpu") return "󰢮"
   return ""
 }

@@ -27,6 +27,7 @@ Panel {
   property var cpu: Model.emptyStats()
   property var mem: Model.emptyStats()
   property var disk: Model.emptyStats()
+  property var gpu: Model.emptyStats()
 
   // Text readouts on horizontal bars, the glyph everywhere else.
   readonly property bool readoutsVisible: !button.vertical && showValues
@@ -52,11 +53,11 @@ Panel {
     return maxHeight
   }
   readonly property real contentWidth: readoutsVisible
-    ? Math.ceil(cpuCaption.implicitWidth + memCaption.implicitWidth + diskCaptionsWidth
-        + barContent.columnSpacing * (1 + diskRepeater.count))
+    ? Math.ceil(cpuCaption.implicitWidth + memCaption.implicitWidth + gpuCaption.implicitWidth + diskCaptionsWidth
+        + barContent.columnSpacing * (2 + diskRepeater.count))
     : Math.ceil(barGlyph.implicitWidth)
   readonly property real contentHeight: readoutsVisible
-    ? Math.ceil(Math.max(cpuCaption.implicitHeight, memCaption.implicitHeight, diskCaptionsHeight))
+    ? Math.ceil(Math.max(cpuCaption.implicitHeight, memCaption.implicitHeight, gpuCaption.implicitHeight, diskCaptionsHeight))
     : Math.ceil(barGlyph.implicitHeight)
 
   // The mark takes the painted extent of that content instead of the default
@@ -96,15 +97,23 @@ Panel {
       diskProc.command = ["bash", root.statsPath, "disk", String(root.processCount)]
       diskProc.running = true
     }
+    if (!gpuProc.running) {
+      gpuProc.command = ["bash", root.statsPath, "gpu", String(root.processCount)]
+      gpuProc.running = true
+    }
   }
 
   function apply(raw, metric) {
     var parsed = Model.parseStats(raw)
     // A transient empty read (fork failure, process churn) must not blank the
-    // bar — keep the last good sample instead.
+    // bar — keep the last good sample instead. GPU's "n/a" text is a real,
+    // valid reading (no supported tool found it), not a transient failure.
     if (metric === "disk") {
       if (parsed.disks.length === 0) return
       disk = parsed
+    } else if (metric === "gpu") {
+      if (parsed.text === "") return
+      gpu = parsed
     } else if (metric === "memory") {
       if (parsed.text === "") return
       mem = parsed
@@ -135,6 +144,14 @@ Panel {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: root.apply(text, "disk")
+    }
+  }
+
+  Process {
+    id: gpuProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.apply(text, "gpu")
     }
   }
 
@@ -175,7 +192,7 @@ Panel {
       id: barContent
       anchors.centerIn: parent
       visible: root.readoutsVisible
-      columns: button.vertical ? 1 : (2 + Math.max(1, root.disk.disks.length))
+      columns: button.vertical ? 1 : (3 + Math.max(1, root.disk.disks.length))
       flow: Grid.LeftToRight
       rowSpacing: Style.space(4)
       columnSpacing: Style.space(8)
@@ -190,6 +207,12 @@ Panel {
         id: memCaption
         name: "MEM"
         value: root.mem.text
+      }
+
+      MetricCaption {
+        id: gpuCaption
+        name: "GPU"
+        value: root.gpu.text
       }
 
       // One caption per mounted disk: plain "DISK" when there is only one,
@@ -310,6 +333,14 @@ Panel {
           width: parent.width
           metric: "memory"
           stats: root.mem
+        }
+
+        PanelSeparator { foreground: root.bar.foreground }
+
+        MetricSection {
+          width: parent.width
+          metric: "gpu"
+          stats: root.gpu
         }
 
         PanelSeparator { foreground: root.bar.foreground }
