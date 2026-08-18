@@ -11,8 +11,10 @@
 #   detail<TAB><footer line, e.g. "0.42  0.55  0.60">
 #   detailLabel<TAB><footer label, e.g. "Load">
 #   proc<TAB><value><TAB><name><TAB><container>
+#   disk<TAB><0-100 percent used><TAB><used, e.g. "6.2G"><TAB><total><TAB><avail><TAB><mountpoint>
 #
 # `container` is empty for processes that are not inside a Docker container.
+# `disk` lines are disk-only, one per mounted filesystem, root first.
 
 set -uo pipefail
 
@@ -147,26 +149,33 @@ memory)
 
 disk)
   # Real filesystems only: skip virtual/pseudo mounts, and keep one row per
-  # device even when it is bind-mounted or mounted more than once.
+  # device even when it is bind-mounted or mounted more than once. Each row
+  # carries a priority (0 for root, 1 for everything else) so root always
+  # sorts first; the rest are ordered largest-first.
+  # The boot partition is excluded too: it is a fixed-size firmware/kernel
+  # slice, not disk capacity anyone is managing, so its usage percentage is
+  # just noise here.
   disk_all=$(df -kPT 2>/dev/null | awk '
     NR == 1 { next }
     $2 ~ /^(tmpfs|devtmpfs|overlay|squashfs|proc|sysfs|cgroup2?|devpts|mqueue|tracefs|debugfs|configfs|pstore|bpf|securityfs|autofs|binfmt_misc|rpc_pipefs|fusectl|efivarfs)$/ { next }
-    { if (seen[$1]++) next; pct = $6; gsub("%", "", pct); printf "%s\t%s\t%s\t%s\t%s\n", $7, pct, $4, $3, $5 }
+    $7 ~ /^\/boot(\/.*)?$/ { next }
+    {
+      if (seen[$1]++) next
+      pct = $6; gsub("%", "", pct)
+      prio = ($7 == "/") ? 0 : 1
+      printf "%s\t%s\t%s\t%s\t%s\t%s\n", prio, $7, pct, $4, $3, $5
+    }
   ')
 
-  # The bar/hero readout is the root filesystem, since that is the one disk
-  # every machine has; the popup lists every other mounted disk underneath it.
-  root_row=$(echo "$disk_all" | awk -F'\t' '$1 == "/"')
-  [[ -z "$root_row" ]] && root_row=$(echo "$disk_all" | sort -t$'\t' -k4 -rn | head -1)
-  IFS=$'\t' read -r _ root_pct root_used root_total root_avail <<<"$root_row"
-
-  printf 'total\t%s\n' "${root_pct:-0}"
-  awk -v u="${root_used:-0}" 'BEGIN { printf "text\t%.1fG\n", u / 1048576 }'
-  awk -v t="${root_total:-0}" 'BEGIN { printf "max\t%.1fG\n", t / 1048576 }'
-  printf 'detailLabel\tAvail\n'
-  awk -v a="${root_avail:-0}" 'BEGIN { printf "detail\t%.1fG\n", a / 1048576 }'
-
-  echo "$disk_all" | sort -t$'\t' -k4 -rn | head -"$count" | awk -F'\t' '{printf "proc\t%s%%\t%s\t\n", $2, $1}'
+  # One `disk` line per mounted filesystem — root first, then every other real
+  # disk largest first — so a machine with several disks gets a numbered
+  # readout for each instead of only the root filesystem.
+  if [[ -n "$disk_all" ]]; then
+    echo "$disk_all" | sort -t$'\t' -k1,1n -k5,5rn | head -"$count" | awk -F'\t' '{
+      pct=$3; used=$4/1048576; total=$5/1048576; avail=$6/1048576
+      printf "disk\t%s\t%.1fG\t%.1fG\t%.1fG\t%s\n", pct, used, total, avail, $2
+    }'
+  fi
   ;;
 
 *)

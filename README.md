@@ -6,7 +6,7 @@ each mounted disk is filling up.
 
 - **CPU, memory, and disk in one widget** — all three readouts in the bar, process lists and disk breakdown in one popup
 - **Per-process breakdown** — the top consumers per metric, aggregated by process name
-- **Multi-disk aware** — every mounted disk is listed, not just the root filesystem
+- **Multi-disk aware** — every mounted disk gets its own readout in the bar and its own section in the popup, not just the root filesystem
 - **Docker-aware** — processes inside containers show the container name underneath
 - **Smart process names** — resolves unhelpful names like `MainThread`, Nix wrappers, and generic interpreters to the real application
 
@@ -74,6 +74,7 @@ first-party widgets do. Editing that entry by hand works just as well:
 | `processCount` | integer 1–20 | `7` | How many rows (processes, or disks) the popup lists per metric |
 | `refreshIntervalSec` | integer 1–60 | `3` | How often stats are sampled |
 | `showValues` | boolean | `true` | Show the `CPU` / `MEM` / `DISK` readouts; off shows the bar-chart icon instead |
+| `diskShowAvailable` | boolean | `true` | Each disk section's hero value is space left; off shows space used instead (the other one moves to the footer) |
 
 ```json
 {
@@ -89,7 +90,8 @@ first-party widgets do. Editing that entry by hand works just as well:
 
 ## The bar readout
 
-Each metric is a two-line caption: its name in small type (`CPU`, `MEM`, `DISK`) with
+Each metric is a two-line caption: its name in small type (`CPU`, `MEM`, `DISK`, or
+`DISK1`/`DISK2`/... on a machine with several disks) with
 the current value under it, the two lines centered on each other and sized to fit
 the bar's height. Vertical bars have no room for text, so they show the bar-chart
 glyph instead and leave the numbers to the popup.
@@ -125,10 +127,15 @@ bar shows the percentage of that total.
 Disk usage comes from `df`, one row per mounted filesystem, so a machine with
 several disks (or a second drive mounted alongside the root filesystem) gets a
 row for each — virtual/pseudo mounts (`tmpfs`, `overlay`, `proc`, and the like)
-are filtered out, and a device bind-mounted more than once is only counted
-once. The bar and hero readout track the root filesystem (`/`); the panel
-lists every other real disk underneath it, each with its own usage percentage,
-sorted largest first. The footer shows space available on the root filesystem.
+are filtered out, `/boot` is filtered out too (a fixed-size firmware/kernel
+slice, not capacity anyone is managing), and a device bind-mounted more than
+once is only counted once. The root filesystem (`/`) always comes first, then every other real disk
+largest first. With only one disk the bar shows a single `DISK` readout; with
+several, each gets its own numbered readout (`DISK1`, `DISK2`, ...). The popup
+mirrors this with one section per disk, named with its mount point, each with
+its own usage bar. By default the hero value is space left, since that is the
+number that tells you whether you are about to run out, with space used in
+the footer; the `Disk sections lead with` setting swaps the two.
 
 ### Process name resolution
 

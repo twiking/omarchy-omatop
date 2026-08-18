@@ -2,9 +2,13 @@
 // TSV contract with bin/omatop-stats lives in one place.
 
 // Parse the TSV emitted by bin/omatop-stats into
-// { total, text, max, detail, detailLabel, procs: [{ value, name, container }] }.
+// { total, text, max, detail, detailLabel, procs: [{ value, name, container }],
+//   disks: [{ pct, text, max, avail, mount }] }.
+// `disks` is only populated for the disk metric, one entry per mounted
+// filesystem (root first), and drives the bar readout and popup instead of
+// the single total/text/max/procs fields the other metrics use.
 function emptyStats() {
-  return { total: 0, text: "", max: "", detail: "", detailLabel: "", procs: [] }
+  return { total: 0, text: "", max: "", detail: "", detailLabel: "", procs: [], disks: [] }
 }
 
 function parseStats(raw) {
@@ -34,6 +38,15 @@ function parseStats(raw) {
     case "proc":
       if (f[2])
         result.procs.push({ value: f[1] || "", name: f[2], container: f[3] || "" })
+      break
+    case "disk":
+      result.disks.push({
+        pct: clampPercent(parseFloat(f[1])),
+        text: f[2] || "",
+        max: f[3] || "",
+        avail: f[4] || "",
+        mount: f[5] || ""
+      })
       break
     }
   }
