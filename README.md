@@ -1,10 +1,12 @@
 # Omatop
 
-An Omarchy bar widget that shows CPU and memory usage side by side and, in its
-popup, which processes are actually eating them.
+An Omarchy bar widget that shows CPU, memory, and disk usage side by side and,
+in its popup, which processes are actually eating the CPU and memory, and how
+each mounted disk is filling up.
 
-- **CPU and memory in one widget** — both readouts in the bar, both process lists in one popup
+- **CPU, memory, and disk in one widget** — all three readouts in the bar, process lists and disk breakdown in one popup
 - **Per-process breakdown** — the top consumers per metric, aggregated by process name
+- **Multi-disk aware** — every mounted disk is listed, not just the root filesystem
 - **Docker-aware** — processes inside containers show the container name underneath
 - **Smart process names** — resolves unhelpful names like `MainThread`, Nix wrappers, and generic interpreters to the real application
 
@@ -16,7 +18,7 @@ This is the Omarchy-shell port of
 ## Requirements
 
 - Omarchy with `omarchy-shell` (Quattro or newer)
-- `bash`, `nproc`, `top`, `ps`, and `free` — the `coreutils` and `procps-ng`
+- `bash`, `nproc`, `top`, `ps`, `free`, and `df` — the `coreutils` and `procps-ng`
   packages an Omarchy install already has
 - A Nerd Font as the bar font, for the metric and chart glyphs (Omarchy's default)
 - Optional: `docker` — container names appear only when the Docker CLI is present;
@@ -69,9 +71,9 @@ first-party widgets do. Editing that entry by hand works just as well:
 
 | Key | Type | Default | What it does |
 |---|---|---|---|
-| `processCount` | integer 1–20 | `7` | How many processes the popup lists per metric |
+| `processCount` | integer 1–20 | `7` | How many rows (processes, or disks) the popup lists per metric |
 | `refreshIntervalSec` | integer 1–60 | `3` | How often stats are sampled |
-| `showValues` | boolean | `true` | Show the `CPU` / `MEM` readouts; off shows the bar-chart icon instead |
+| `showValues` | boolean | `true` | Show the `CPU` / `MEM` / `DISK` readouts; off shows the bar-chart icon instead |
 
 ```json
 {
@@ -87,7 +89,7 @@ first-party widgets do. Editing that entry by hand works just as well:
 
 ## The bar readout
 
-Each metric is a two-line caption: its name in small type (`CPU`, `MEM`) with
+Each metric is a two-line caption: its name in small type (`CPU`, `MEM`, `DISK`) with
 the current value under it, the two lines centered on each other and sized to fit
 the bar's height. Vertical bars have no room for text, so they show the bar-chart
 glyph instead and leave the numbers to the popup.
@@ -100,7 +102,7 @@ glyph instead and leave the numbers to the popup.
 
 ## How it works
 
-`bin/omatop-stats <cpu|memory> [count]` collects one metric in a single shot and
+`bin/omatop-stats <cpu|memory|disk> [count]` collects one metric in a single shot and
 prints line-based TSV; `Panel.qml` runs it once per metric on a timer and
 `Model.js` parses the output. Running the script by hand is the fastest way to
 debug a wrong-looking number.
@@ -118,9 +120,19 @@ of the same program (browser tabs, workers) are summed into one row. The bar
 label shows used memory in GB, the panel adds total RAM after it, and the usage
 bar shows the percentage of that total.
 
+### Disk
+
+Disk usage comes from `df`, one row per mounted filesystem, so a machine with
+several disks (or a second drive mounted alongside the root filesystem) gets a
+row for each — virtual/pseudo mounts (`tmpfs`, `overlay`, `proc`, and the like)
+are filtered out, and a device bind-mounted more than once is only counted
+once. The bar and hero readout track the root filesystem (`/`); the panel
+lists every other real disk underneath it, each with its own usage percentage,
+sorted largest first. The footer shows space available on the root filesystem.
+
 ### Process name resolution
 
-Both metrics handle cases where the reported process name is unhelpful:
+CPU and memory handle cases where the reported process name is unhelpful:
 
 - `MainThread` (Python apps) — resolved from the command line
 - `.foo-wrapped` / `.foo-wrap` (Nix wrappers) — resolved to the actual binary name

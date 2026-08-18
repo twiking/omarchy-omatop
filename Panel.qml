@@ -23,6 +23,7 @@ Panel {
 
   property var cpu: Model.emptyStats()
   property var mem: Model.emptyStats()
+  property var disk: Model.emptyStats()
 
   // Text readouts on horizontal bars, the glyph everywhere else.
   readonly property bool readoutsVisible: !button.vertical && showValues
@@ -31,10 +32,10 @@ Panel {
   // positioner's implicit size carries spacing the content does not paint, and
   // the open-panel mark below tracks this extent, so it would overshoot.
   readonly property real contentWidth: readoutsVisible
-    ? Math.ceil(cpuCaption.implicitWidth + memCaption.implicitWidth + barContent.columnSpacing)
+    ? Math.ceil(cpuCaption.implicitWidth + memCaption.implicitWidth + diskCaption.implicitWidth + barContent.columnSpacing * 2)
     : Math.ceil(barGlyph.implicitWidth)
   readonly property real contentHeight: readoutsVisible
-    ? Math.ceil(Math.max(cpuCaption.implicitHeight, memCaption.implicitHeight))
+    ? Math.ceil(Math.max(cpuCaption.implicitHeight, memCaption.implicitHeight, diskCaption.implicitHeight))
     : Math.ceil(barGlyph.implicitHeight)
 
   // The mark takes the painted extent of that content instead of the default
@@ -59,8 +60,8 @@ Panel {
   // used, so a container row reads as a container row under any theme.
   readonly property color dockerColor: "#50a0e0"
 
-  // Both metrics are sampled on every tick: the bar shows both values, and the
-  // popup then opens on data that is already current.
+  // All three metrics are sampled on every tick: the bar shows all three
+  // values, and the popup then opens on data that is already current.
   function refresh() {
     if (!cpuProc.running) {
       cpuProc.command = ["bash", root.statsPath, "cpu", String(root.processCount)]
@@ -70,6 +71,10 @@ Panel {
       memProc.command = ["bash", root.statsPath, "memory", String(root.processCount)]
       memProc.running = true
     }
+    if (!diskProc.running) {
+      diskProc.command = ["bash", root.statsPath, "disk", String(root.processCount)]
+      diskProc.running = true
+    }
   }
 
   function apply(raw, metric) {
@@ -78,6 +83,7 @@ Panel {
     // bar — keep the last good sample instead.
     if (parsed.text === "") return
     if (metric === "memory") mem = parsed
+    else if (metric === "disk") disk = parsed
     else cpu = parsed
   }
 
@@ -94,6 +100,14 @@ Panel {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: root.apply(text, "memory")
+    }
+  }
+
+  Process {
+    id: diskProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.apply(text, "disk")
     }
   }
 
@@ -134,7 +148,7 @@ Panel {
       id: barContent
       anchors.centerIn: parent
       visible: root.readoutsVisible
-      columns: button.vertical ? 1 : 2
+      columns: button.vertical ? 1 : 3
       flow: Grid.LeftToRight
       rowSpacing: Style.space(4)
       columnSpacing: Style.space(8)
@@ -149,6 +163,12 @@ Panel {
         id: memCaption
         name: "MEM"
         value: root.mem.text
+      }
+
+      MetricCaption {
+        id: diskCaption
+        name: "DISK"
+        value: root.disk.text
       }
     }
 
@@ -258,6 +278,14 @@ Panel {
 
         PanelSeparator { foreground: root.bar.foreground }
 
+        MetricSection {
+          width: parent.width
+          metric: "disk"
+          stats: root.disk
+        }
+
+        PanelSeparator { foreground: root.bar.foreground }
+
         // ---------- Settings, collapsed until asked for ----------
         Column {
           width: parent.width
@@ -309,7 +337,7 @@ Panel {
             }
 
             SettingRow {
-              label: "Processes per metric"
+              label: "Rows per metric"
               suffix: "rows"
               value: root.processCount
               from: 1

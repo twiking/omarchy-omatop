@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Emit CPU or memory stats for the Omatop bar widget.
+# Emit CPU, memory, or disk stats for the Omatop bar widget.
 #
-# Usage: omatop-stats <cpu|memory> [process-count]
+# Usage: omatop-stats <cpu|memory|disk> [process-count]
 #
 # Output is line-based TSV so the QML side can parse it without jq:
 #
@@ -145,8 +145,32 @@ memory)
   }'
   ;;
 
+disk)
+  # Real filesystems only: skip virtual/pseudo mounts, and keep one row per
+  # device even when it is bind-mounted or mounted more than once.
+  disk_all=$(df -kPT 2>/dev/null | awk '
+    NR == 1 { next }
+    $2 ~ /^(tmpfs|devtmpfs|overlay|squashfs|proc|sysfs|cgroup2?|devpts|mqueue|tracefs|debugfs|configfs|pstore|bpf|securityfs|autofs|binfmt_misc|rpc_pipefs|fusectl|efivarfs)$/ { next }
+    { if (seen[$1]++) next; pct = $6; gsub("%", "", pct); printf "%s\t%s\t%s\t%s\t%s\n", $7, pct, $4, $3, $5 }
+  ')
+
+  # The bar/hero readout is the root filesystem, since that is the one disk
+  # every machine has; the popup lists every other mounted disk underneath it.
+  root_row=$(echo "$disk_all" | awk -F'\t' '$1 == "/"')
+  [[ -z "$root_row" ]] && root_row=$(echo "$disk_all" | sort -t$'\t' -k4 -rn | head -1)
+  IFS=$'\t' read -r _ root_pct root_used root_total root_avail <<<"$root_row"
+
+  printf 'total\t%s\n' "${root_pct:-0}"
+  awk -v u="${root_used:-0}" 'BEGIN { printf "text\t%.1fG\n", u / 1048576 }'
+  awk -v t="${root_total:-0}" 'BEGIN { printf "max\t%.1fG\n", t / 1048576 }'
+  printf 'detailLabel\tAvail\n'
+  awk -v a="${root_avail:-0}" 'BEGIN { printf "detail\t%.1fG\n", a / 1048576 }'
+
+  echo "$disk_all" | sort -t$'\t' -k4 -rn | head -"$count" | awk -F'\t' '{printf "proc\t%s%%\t%s\t\n", $2, $1}'
+  ;;
+
 *)
-  echo "usage: omatop-stats <cpu|memory> [process-count]" >&2
+  echo "usage: omatop-stats <cpu|memory|disk> [process-count]" >&2
   exit 1
   ;;
 esac

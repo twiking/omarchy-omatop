@@ -62,7 +62,9 @@ function longestValue(procs) {
 }
 
 function metricTitle(metric) {
-  return metric === "memory" ? "Memory" : "CPU"
+  if (metric === "memory") return "Memory"
+  if (metric === "disk") return "Disk"
+  return "CPU"
 }
 
 // The widget's own glyph (nf-md-chart_bar), shown in place of the bar readouts
@@ -71,7 +73,10 @@ function widgetIcon() {
   return "󰄨"
 }
 
-// Nerd Font glyphs: microchip for CPU, memory sticks for RAM.
+// Nerd Font glyphs: microchip for CPU, memory sticks for RAM, hard disk for
+// storage.
 function metricIcon(metric) {
-  return metric === "memory" ? "" : ""
+  if (metric === "memory") return ""
+  if (metric === "disk") return "󰋊"
+  return ""
 }

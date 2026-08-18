@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "author": "Tobias Wiking",
   "license": "MIT",
-  "description": "CPU and memory usage in the bar with a per-process breakdown popup, Docker container awareness, and smart process-name resolution.",
+  "description": "CPU, memory, and disk usage in the bar with a per-process breakdown popup, multi-disk awareness, Docker container awareness, and smart process-name resolution.",
   "kinds": [
     "bar-widget"
   ],
@@ -14,7 +14,7 @@
   },
   "barWidget": {
     "displayName": "Omatop",
-    "description": "CPU and memory usage plus the top processes eating each, with Docker container names.",
+    "description": "CPU, memory, and disk usage plus the top processes eating each and every mounted disk, with Docker container names.",
     "category": "System",
     "allowMultiple": false,
     "defaultSection": "right",
@@ -27,7 +27,7 @@
       {
         "key": "processCount",
         "type": "integer",
-        "label": "Processes listed per metric",
+        "label": "Rows listed per metric",
         "min": 1,
         "max": 20,
         "step": 1,
@@ -45,7 +45,7 @@
       {
         "key": "showValues",
         "type": "boolean",
-        "label": "Show the CPU and MEM values in the bar",
+        "label": "Show the CPU, MEM, and DISK values in the bar",
         "defaultValue": true,
         "description": "Off shows the bar-chart icon instead."
       }
