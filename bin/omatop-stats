@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Emit CPU or memory stats for the Omatop bar widget.
+# Emit CPU, memory, disk, or GPU stats for the Omatop bar widget.
 #
-# Usage: omatop-stats <cpu|memory> [process-count]
+# Usage: omatop-stats <cpu|memory|disk|gpu> [process-count]
 #
 # Output is line-based TSV so the QML side can parse it without jq:
 #
@@ -11,8 +11,10 @@
 #   detail<TAB><footer line, e.g. "0.42  0.55  0.60">
 #   detailLabel<TAB><footer label, e.g. "Load">
 #   proc<TAB><value><TAB><name><TAB><container>
+#   disk<TAB><0-100 percent used><TAB><used, e.g. "6.2G"><TAB><total><TAB><avail><TAB><mountpoint>
 #
 # `container` is empty for processes that are not inside a Docker container.
+# `disk` lines are disk-only, one per mounted filesystem, root first.
 
 set -uo pipefail
 
@@ -145,8 +147,110 @@ memory)
   }'
   ;;
 
+disk)
+  # Real filesystems only: skip virtual/pseudo mounts, and keep one row per
+  # device even when it is bind-mounted or mounted more than once. Each row
+  # carries a priority (0 for root, 1 for everything else) so root always
+  # sorts first; the rest are ordered largest-first.
+  # The boot partition is excluded too: it is a fixed-size firmware/kernel
+  # slice, not disk capacity anyone is managing, so its usage percentage is
+  # just noise here.
+  disk_all=$(df -kPT 2>/dev/null | awk '
+    NR == 1 { next }
+    $2 ~ /^(tmpfs|devtmpfs|overlay|squashfs|proc|sysfs|cgroup2?|devpts|mqueue|tracefs|debugfs|configfs|pstore|bpf|securityfs|autofs|binfmt_misc|rpc_pipefs|fusectl|efivarfs)$/ { next }
+    $7 ~ /^\/boot(\/.*)?$/ { next }
+    {
+      if (seen[$1]++) next
+      pct = $6; gsub("%", "", pct)
+      prio = ($7 == "/") ? 0 : 1
+      printf "%s\t%s\t%s\t%s\t%s\t%s\n", prio, $7, pct, $4, $3, $5
+    }
+  ')
+
+  # One `disk` line per mounted filesystem — root first, then every other real
+  # disk largest first — so a machine with several disks gets a numbered
+  # readout for each instead of only the root filesystem.
+  if [[ -n "$disk_all" ]]; then
+    echo "$disk_all" | sort -t$'\t' -k1,1n -k5,5rn | head -"$count" | awk -F'\t' '{
+      pct=$3; used=$4/1048576; total=$5/1048576; avail=$6/1048576
+      printf "disk\t%s\t%.1fG\t%.1fG\t%.1fG\t%s\n", pct, used, total, avail, $2
+    }'
+  fi
+  ;;
+
+gpu)
+  # First vendor tool that actually returns a reading wins:
+  #   NVIDIA -> nvidia-smi (only touched when the driver is bound, since a
+  #             leftover binary with no driver can block for seconds)
+  #   AMD    -> kernel sysfs gpu_busy_percent, no extra package
+  #   Intel  -> RC6 idle residency over a short sample, when neither above
+  #             produced a reading
+  # The name is looked up separately via lspci so it can still show even
+  # when none of the above could read a utilization percentage.
+  gpu_pct=""
+  gpu_name=""
+
+  if [[ -r /proc/driver/nvidia/version ]] && command -v nvidia-smi &>/dev/null; then
+    gpu_pct=$(timeout 2 nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>/dev/null \
+      | awk -F, '{gsub(/[^0-9]/, "", $1); if ($1 != "" && ($1 + 0) > (max + 0)) max = $1} END { if (max != "") print max }')
+    if [[ -n "$gpu_pct" ]]; then
+      gpu_name=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1)
+    fi
+  fi
+
+  if [[ -z "$gpu_pct" ]]; then
+    for f in /sys/class/drm/card*/device/gpu_busy_percent; do
+      [[ -f "$f" ]] || continue
+      v=$(tr -dc '0-9' < "$f" 2>/dev/null)
+      [[ -n "$v" ]] && { gpu_pct=$v; break; }
+    done
+  fi
+
+  if [[ -z "$gpu_pct" ]]; then
+    for f in /sys/class/drm/card*/gt/gt*/rc6_residency_ms; do
+      [[ -f "$f" ]] || continue
+      enable="${f%rc6_residency_ms}rc6_enable"
+      [[ -f "$enable" && "$(cat "$enable" 2>/dev/null)" == "0" ]] && continue
+      r1=$(cat "$f" 2>/dev/null) || continue
+      sleep 0.2
+      r2=$(cat "$f" 2>/dev/null) || continue
+      gpu_pct=$(awk -v idle="$((r2 - r1))" 'BEGIN {
+        pct = 100 - (idle / 200 * 100)
+        if (pct < 0) pct = 0
+        if (pct > 100) pct = 100
+        printf "%.0f", pct
+      }')
+      break
+    done
+  fi
+
+  if command -v lspci &>/dev/null; then
+    gpu_name=$(lspci -mm 2>/dev/null | awk -F'"' '
+      /"VGA compatible controller"|"3D controller"|"Display controller"/ {
+        vendor = $4; device = $6
+        gsub(/ Corporation$/, "", vendor)
+        gsub(/^Advanced Micro Devices, Inc\.?/, "AMD", vendor)
+        print vendor " " device
+        exit
+      }
+    ')
+  fi
+
+  if [[ -n "$gpu_pct" ]]; then
+    printf 'total\t%s\n' "$gpu_pct"
+    printf 'text\t%s%%\n' "$gpu_pct"
+  else
+    printf 'total\t0\n'
+    printf 'text\tn/a\n'
+  fi
+  if [[ -n "$gpu_name" ]]; then
+    printf 'detailLabel\tGPU\n'
+    printf 'detail\t%s\n' "$gpu_name"
+  fi
+  ;;
+
 *)
-  echo "usage: omatop-stats <cpu|memory> [process-count]" >&2
+  echo "usage: omatop-stats <cpu|memory|disk|gpu> [process-count]" >&2
   exit 1
   ;;
 esac

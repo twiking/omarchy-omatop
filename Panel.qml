@@ -18,11 +18,16 @@ Panel {
   // `showLabel` was this key's name in pre-release builds; entries written then
   // still carry it.
   readonly property bool showValues: setting("showValues", setting("showLabel", true)) === true
+  // Disk sections lead with space left, not space used, by default — that is
+  // the number that tells you whether you are about to run out.
+  readonly property bool diskShowAvailable: setting("diskShowAvailable", true) === true
 
   readonly property string statsPath: String(Qt.resolvedUrl("bin/omatop-stats")).replace(/^file:\/\//, "")
 
   property var cpu: Model.emptyStats()
   property var mem: Model.emptyStats()
+  property var disk: Model.emptyStats()
+  property var gpu: Model.emptyStats()
 
   // Text readouts on horizontal bars, the glyph everywhere else.
   readonly property bool readoutsVisible: !button.vertical && showValues
@@ -30,11 +35,29 @@ Panel {
   // Measured off the readouts themselves rather than off their container: a
   // positioner's implicit size carries spacing the content does not paint, and
   // the open-panel mark below tracks this extent, so it would overshoot.
+  // The disk captions are counted separately since there is one per disk.
+  readonly property real diskCaptionsWidth: {
+    var total = 0
+    for (var i = 0; i < diskRepeater.count; i++) {
+      var item = diskRepeater.itemAt(i)
+      if (item) total += item.implicitWidth
+    }
+    return total
+  }
+  readonly property real diskCaptionsHeight: {
+    var maxHeight = 0
+    for (var i = 0; i < diskRepeater.count; i++) {
+      var item = diskRepeater.itemAt(i)
+      if (item) maxHeight = Math.max(maxHeight, item.implicitHeight)
+    }
+    return maxHeight
+  }
   readonly property real contentWidth: readoutsVisible
-    ? Math.ceil(cpuCaption.implicitWidth + memCaption.implicitWidth + barContent.columnSpacing)
+    ? Math.ceil(cpuCaption.implicitWidth + memCaption.implicitWidth + gpuCaption.implicitWidth + diskCaptionsWidth
+        + barContent.columnSpacing * (2 + diskRepeater.count))
     : Math.ceil(barGlyph.implicitWidth)
   readonly property real contentHeight: readoutsVisible
-    ? Math.ceil(Math.max(cpuCaption.implicitHeight, memCaption.implicitHeight))
+    ? Math.ceil(Math.max(cpuCaption.implicitHeight, memCaption.implicitHeight, gpuCaption.implicitHeight, diskCaptionsHeight))
     : Math.ceil(barGlyph.implicitHeight)
 
   // The mark takes the painted extent of that content instead of the default
@@ -59,8 +82,8 @@ Panel {
   // used, so a container row reads as a container row under any theme.
   readonly property color dockerColor: "#50a0e0"
 
-  // Both metrics are sampled on every tick: the bar shows both values, and the
-  // popup then opens on data that is already current.
+  // All three metrics are sampled on every tick: the bar shows all three
+  // values, and the popup then opens on data that is already current.
   function refresh() {
     if (!cpuProc.running) {
       cpuProc.command = ["bash", root.statsPath, "cpu", String(root.processCount)]
@@ -70,15 +93,34 @@ Panel {
       memProc.command = ["bash", root.statsPath, "memory", String(root.processCount)]
       memProc.running = true
     }
+    if (!diskProc.running) {
+      diskProc.command = ["bash", root.statsPath, "disk", String(root.processCount)]
+      diskProc.running = true
+    }
+    if (!gpuProc.running) {
+      gpuProc.command = ["bash", root.statsPath, "gpu", String(root.processCount)]
+      gpuProc.running = true
+    }
   }
 
   function apply(raw, metric) {
     var parsed = Model.parseStats(raw)
     // A transient empty read (fork failure, process churn) must not blank the
-    // bar — keep the last good sample instead.
-    if (parsed.text === "") return
-    if (metric === "memory") mem = parsed
-    else cpu = parsed
+    // bar — keep the last good sample instead. GPU's "n/a" text is a real,
+    // valid reading (no supported tool found it), not a transient failure.
+    if (metric === "disk") {
+      if (parsed.disks.length === 0) return
+      disk = parsed
+    } else if (metric === "gpu") {
+      if (parsed.text === "") return
+      gpu = parsed
+    } else if (metric === "memory") {
+      if (parsed.text === "") return
+      mem = parsed
+    } else {
+      if (parsed.text === "") return
+      cpu = parsed
+    }
   }
 
   Process {
@@ -94,6 +136,22 @@ Panel {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: root.apply(text, "memory")
+    }
+  }
+
+  Process {
+    id: diskProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.apply(text, "disk")
+    }
+  }
+
+  Process {
+    id: gpuProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.apply(text, "gpu")
     }
   }
 
@@ -134,7 +192,7 @@ Panel {
       id: barContent
       anchors.centerIn: parent
       visible: root.readoutsVisible
-      columns: button.vertical ? 1 : 2
+      columns: button.vertical ? 1 : (3 + Math.max(1, root.disk.disks.length))
       flow: Grid.LeftToRight
       rowSpacing: Style.space(4)
       columnSpacing: Style.space(8)
@@ -149,6 +207,27 @@ Panel {
         id: memCaption
         name: "MEM"
         value: root.mem.text
+      }
+
+      MetricCaption {
+        id: gpuCaption
+        name: "GPU"
+        value: root.gpu.text
+      }
+
+      // One caption per mounted disk: plain "DISK" when there is only one,
+      // numbered "DISK1"/"DISK2"/... when a machine has several, so the bar
+      // itself reflects every disk instead of just the root filesystem.
+      Repeater {
+        id: diskRepeater
+        model: root.disk.disks.length > 0 ? root.disk.disks : [{ pct: 0, text: "", max: "", avail: "", mount: "" }]
+
+        MetricCaption {
+          required property var modelData
+          required property int index
+          name: root.disk.disks.length > 1 ? "DISK" + (index + 1) : "DISK"
+          value: root.disk.disks.length > 0 ? modelData.pct + "%" : ""
+        }
       }
     }
 
@@ -258,6 +337,47 @@ Panel {
 
         PanelSeparator { foreground: root.bar.foreground }
 
+        MetricSection {
+          width: parent.width
+          metric: "gpu"
+          stats: root.gpu
+        }
+
+        PanelSeparator { foreground: root.bar.foreground }
+
+        // One section per mounted disk, each with its own hero value, usage
+        // bar, and footer for the other of used/available — root filesystem
+        // first. Which one leads the hero follows the diskShowAvailable
+        // setting.
+        Repeater {
+          model: root.disk.disks
+
+          delegate: Column {
+            id: diskEntry
+            required property var modelData
+            required property int index
+            width: parent ? parent.width : 0
+            spacing: Style.space(16)
+
+            MetricSection {
+              width: parent.width
+              metric: "disk"
+              titleOverride: (root.disk.disks.length > 1 ? "Disk " + (diskEntry.index + 1) : "Disk")
+                + " · " + diskEntry.modelData.mount
+              stats: ({
+                total: diskEntry.modelData.pct,
+                text: root.diskShowAvailable ? diskEntry.modelData.avail : diskEntry.modelData.text,
+                max: diskEntry.modelData.max,
+                detail: root.diskShowAvailable ? diskEntry.modelData.text : diskEntry.modelData.avail,
+                detailLabel: root.diskShowAvailable ? "Used" : "Avail",
+                procs: []
+              })
+            }
+
+            PanelSeparator { foreground: root.bar.foreground }
+          }
+        }
+
         // ---------- Settings, collapsed until asked for ----------
         Column {
           width: parent.width
@@ -309,7 +429,7 @@ Panel {
             }
 
             SettingRow {
-              label: "Processes per metric"
+              label: "Rows per metric"
               suffix: "rows"
               value: root.processCount
               from: 1
@@ -324,6 +444,15 @@ Panel {
                 : "numbers only in this panel"
               choice: root.showValues ? "Usage" : "Icon only"
               onToggled: root.saveSetting("showValues", !root.showValues)
+            }
+
+            ChoiceRow {
+              label: "Disk sections lead with"
+              suffix: root.diskShowAvailable
+                ? "space left, used space in the footer"
+                : "space used, space left in the footer"
+              choice: root.diskShowAvailable ? "Space left" : "Space used"
+              onToggled: root.saveSetting("diskShowAvailable", !root.diskShowAvailable)
             }
           }
         }
@@ -453,6 +582,9 @@ Panel {
 
     property string metric: "cpu"
     property var stats: Model.emptyStats()
+    // Overrides Model.metricTitle(metric) when set, e.g. to name a specific
+    // disk and its mount point.
+    property string titleOverride: ""
 
     readonly property real fraction: Model.fraction(stats.total)
     // Sized to the widest value in this section, so its rows sit flush against
@@ -486,7 +618,7 @@ Panel {
 
       Text {
         id: heroTitle
-        text: Model.metricTitle(section.metric)
+        text: section.titleOverride !== "" ? section.titleOverride : Model.metricTitle(section.metric)
         color: root.bar.foreground
         font.family: root.bar.fontFamily
         font.pixelSize: Style.font.title
