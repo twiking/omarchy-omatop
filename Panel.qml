@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "Model.js" as Model
 
@@ -174,7 +175,7 @@ Panel {
     text: Model.widgetIcon()
     fontSize: glyphSize
     fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
-    color: root.bar ? root.bar.barForeground : Color.foreground
+    color: root.bar ? root.bar.barForeground : Commons.Color.foreground
   }
 
   // One metric's bar readout: its name above the current value, both small
@@ -195,7 +196,7 @@ Panel {
       anchors.top: parent.top
       anchors.horizontalCenter: parent.horizontalCenter
       text: caption.name
-      color: root.bar ? root.bar.barForeground : Color.foreground
+      color: root.bar ? root.bar.barForeground : Commons.Color.foreground
       opacity: 0.6
       font.family: root.bar ? root.bar.fontFamily : Style.font.family
       font.pixelSize: Math.max(5, Style.font.caption - Style.space(4))
@@ -210,7 +211,7 @@ Panel {
       anchors.bottom: parent.bottom
       anchors.horizontalCenter: parent.horizontalCenter
       text: caption.value !== "" ? caption.value : "—"
-      color: root.bar ? root.bar.barForeground : Color.foreground
+      color: root.bar ? root.bar.barForeground : Commons.Color.foreground
       font.family: root.bar ? root.bar.fontFamily : Style.font.family
       font.pixelSize: Math.max(7, Style.font.caption - Style.space(2))
       lineHeightMode: Text.FixedHeight
